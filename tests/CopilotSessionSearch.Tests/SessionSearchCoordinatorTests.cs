@@ -1,0 +1,197 @@
+#nullable enable
+
+using System.Collections.Concurrent;
+using CopilotSessionSearch.Models;
+using CopilotSessionSearch.Services;
+
+namespace CopilotSessionSearch.Tests;
+
+public sealed class SessionSearchCoordinatorTests
+{
+    [Fact]
+    public async Task SearchUsesBoundedParallelWorkersAndReportsEverySession()
+    {
+        SessionDescriptor[] sessions = Enumerable.Range(0, 8)
+            .Select(CreateDescriptor)
+            .ToArray();
+        var historySource = new FakeHistorySource(sessions, TimeSpan.FromMilliseconds(40));
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            maximumConcurrency: 3);
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync("needle", CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        Assert.InRange(historySource.MaximumObservedConcurrency, 2, 3);
+        Assert.Equal(8, updates.Count(update => update.Result is not null));
+        Assert.Equal(8, updates[^1].Progress.CompletedSessions);
+        Assert.Equal(8, updates[^1].Progress.MatchingSessions);
+        Assert.Equal(0, updates[^1].Progress.FailedSessions);
+    }
+
+    [Fact]
+    public async Task SearchReportsFailuresWithoutDiscardingOtherResults()
+    {
+        SessionDescriptor[] sessions = Enumerable.Range(0, 4)
+            .Select(CreateDescriptor)
+            .ToArray();
+        var historySource = new FakeHistorySource(
+            sessions,
+            TimeSpan.Zero,
+            failedSessionId: sessions[1].SessionId);
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            maximumConcurrency: 2);
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync("needle", CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal(3, updates.Count(update => update.Result is not null));
+        SessionSearchFailure failure = Assert.Single(
+            updates.Where(update => update.Failure is not null).Select(update => update.Failure!));
+        Assert.Equal(sessions[1].SessionId, failure.Session.SessionId);
+        Assert.Equal(1, updates[^1].Progress.FailedSessions);
+    }
+
+    [Fact]
+    public async Task SearchCancelsAllWorkers()
+    {
+        SessionDescriptor[] sessions = Enumerable.Range(0, 20)
+            .Select(CreateDescriptor)
+            .ToArray();
+        var historySource = new FakeHistorySource(sessions, TimeSpan.FromSeconds(1));
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            maximumConcurrency: 4);
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () =>
+            {
+                await foreach (SessionSearchUpdate _ in coordinator.SearchAsync(
+                    "needle",
+                    cancellationSource.Token))
+                {
+                }
+            });
+
+        Assert.True(historySource.CancelledLoadCount > 0);
+    }
+
+    private static SessionDescriptor CreateDescriptor(int index)
+    {
+        return new SessionDescriptor(
+            $"session-{index}",
+            $"Session {index}",
+            DateTimeOffset.Parse("2026-09-01T10:00:00Z").AddDays(index),
+            DateTimeOffset.Parse("2026-09-01T11:00:00Z").AddDays(index),
+            $@"Q:\ws\project-{index}",
+            "owner/repository",
+            "main");
+    }
+
+    private sealed class FakeHistorySource : ISessionHistorySource
+    {
+        private readonly IReadOnlyList<SessionDescriptor> _sessions;
+        private readonly TimeSpan _delay;
+        private readonly string? _failedSessionId;
+        private int _activeLoadCount;
+        private int _maximumObservedConcurrency;
+        private int _cancelledLoadCount;
+
+        public FakeHistorySource(
+            IReadOnlyList<SessionDescriptor> sessions,
+            TimeSpan delay,
+            string? failedSessionId = null)
+        {
+            _sessions = sessions;
+            _delay = delay;
+            _failedSessionId = failedSessionId;
+        }
+
+        public int MaximumObservedConcurrency => Volatile.Read(ref _maximumObservedConcurrency);
+
+        public int CancelledLoadCount => Volatile.Read(ref _cancelledLoadCount);
+
+        public Task<IReadOnlyList<SessionDescriptor>> GetSessionsAsync(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_sessions);
+        }
+
+        public async Task<SessionDocument> GetSessionDocumentAsync(
+            SessionDescriptor session,
+            CancellationToken cancellationToken)
+        {
+            int activeLoads = Interlocked.Increment(ref _activeLoadCount);
+            SetMaximumConcurrency(activeLoads);
+
+            try
+            {
+                await Task.Delay(_delay, cancellationToken);
+
+                if (string.Equals(
+                    session.SessionId,
+                    _failedSessionId,
+                    StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Synthetic history failure.");
+                }
+
+                return new SessionDocument(
+                    session,
+                    [
+                        new ConversationEntry(
+                            $"{session.SessionId}-event",
+                            ConversationSpeaker.User,
+                            session.ModifiedTime,
+                            $"A needle appears in {session.Name}."),
+                    ]);
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancelledLoadCount);
+                throw;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeLoadCount);
+            }
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        private void SetMaximumConcurrency(int candidate)
+        {
+            int observed;
+            do
+            {
+                observed = Volatile.Read(ref _maximumObservedConcurrency);
+                if (candidate <= observed)
+                {
+                    return;
+                }
+            }
+            while (Interlocked.CompareExchange(
+                ref _maximumObservedConcurrency,
+                candidate,
+                observed) != observed);
+        }
+    }
+}

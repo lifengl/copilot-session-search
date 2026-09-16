@@ -1,0 +1,203 @@
+﻿<Window x:Class="CopilotSessionSearch.Views.SessionDetailsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CopilotSessionSearch.Controls"
+        Height="780"
+        MinHeight="520"
+        MinWidth="760"
+        Title="{Binding Name, StringFormat=Session details - {0}}"
+        Width="1080"
+        WindowStartupLocation="CenterOwner">
+  <Window.Resources>
+    <DataTemplate x:Key="DetailSectionTemplate">
+      <Grid Margin="4">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock FontWeight="SemiBold">
+          <Run Text="{Binding SpeakerText, Mode=OneTime}" />
+          <Run Text=" - " />
+          <Run Text="{Binding TimestampText, Mode=OneTime}" />
+          <Run Text=" - " />
+          <Run Text="{Binding MessageText, Mode=OneTime}" />
+          <Run Text=" - " />
+          <Run Text="{Binding OccurrenceText, Mode=OneTime}" />
+        </TextBlock>
+
+        <controls:HighlightedTextBlock Grid.Row="1"
+                                       HighlightText="{Binding Query, Mode=OneTime}"
+                                       Margin="0,6,0,0"
+                                       SourceText="{Binding DetailText, Mode=OneTime}"
+                                       TextWrapping="Wrap" />
+
+        <Expander Grid.Row="2"
+                  Header="Show full message"
+                  Margin="0,8,0,0"
+                  Visibility="{Binding HasAdditionalText, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneTime}">
+          <controls:HighlightedTextBlock HighlightText="{Binding Query, Mode=OneTime}"
+                                         Margin="0,6,0,0"
+                                         SourceText="{Binding FullText, Mode=OneTime}"
+                                         TextWrapping="Wrap" />
+        </Expander>
+      </Grid>
+    </DataTemplate>
+
+    <Style x:Key="DetailItemStyle" TargetType="{x:Type ListViewItem}">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Setter Property="Padding" Value="8" />
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+            BorderThickness="1"
+            Padding="12">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.ColumnSpan="2"
+                   FontSize="18"
+                   FontWeight="SemiBold"
+                   Text="{Binding Name, Mode=OneTime}"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="1"
+                   FontWeight="SemiBold"
+                   Margin="0,8,12,0"
+                   Text="Session ID:" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="1"
+                   Margin="0,8,0,0"
+                   Text="{Binding SessionId, Mode=OneTime}"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="2"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Working directory:" />
+        <TextBlock Grid.Row="2"
+                   Grid.Column="1"
+                   Margin="0,4,0,0"
+                   Text="{Binding WorkingDirectory, Mode=OneTime}"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="3"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Repository:" />
+        <TextBlock Grid.Row="3"
+                   Grid.Column="1"
+                   Margin="0,4,0,0"
+                   Text="{Binding RepositoryAndBranch, Mode=OneTime}"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="4"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Started:" />
+        <TextBlock Grid.Row="4"
+                   Grid.Column="1"
+                   Margin="0,4,0,0"
+                   Text="{Binding StartTimeText, Mode=OneTime}" />
+
+        <TextBlock Grid.Row="5"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Last active:" />
+        <TextBlock Grid.Row="5"
+                   Grid.Column="1"
+                   Margin="0,4,0,0"
+                   Text="{Binding LastActiveText, Mode=OneTime}" />
+
+        <TextBlock Grid.Row="6"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Session span:" />
+        <TextBlock Grid.Row="6"
+                   Grid.Column="1"
+                   Margin="0,4,0,0">
+          <Run Text="{Binding SessionSpanText, Mode=OneTime}" />
+          <Run Text=" - " />
+          <Run Text="{Binding MessageCountText, Mode=OneTime}" />
+        </TextBlock>
+
+        <TextBlock Grid.Row="7"
+                   FontWeight="SemiBold"
+                   Margin="0,4,12,0"
+                   Text="Search:" />
+        <TextBlock Grid.Row="7"
+                   Grid.Column="1"
+                   Margin="0,4,0,0">
+          <Run Text="{Binding Query, Mode=OneTime}" />
+          <Run Text=" - " />
+          <Run Text="{Binding MatchCountText, Mode=OneTime}" />
+        </TextBlock>
+      </Grid>
+    </Border>
+
+    <ListView Grid.Row="1"
+              AutomationProperties.Name="Matching conversation sections"
+              ItemContainerStyle="{StaticResource DetailItemStyle}"
+              ItemTemplate="{StaticResource DetailSectionTemplate}"
+              ItemsSource="{Binding Sections}"
+              Margin="0,12,0,0"
+              ScrollViewer.CanContentScroll="True"
+              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+              VirtualizingPanel.IsVirtualizing="True"
+              VirtualizingPanel.VirtualizationMode="Recycling" />
+
+    <TextBlock Grid.Row="2"
+               AutomationProperties.LiveSetting="Assertive"
+               FontWeight="SemiBold"
+               Margin="0,8,0,0"
+               Text="{Binding ErrorMessage}">
+      <TextBlock.Style>
+        <Style TargetType="{x:Type TextBlock}">
+          <Setter Property="Visibility" Value="Visible" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </TextBlock.Style>
+    </TextBlock>
+
+    <StackPanel Grid.Row="3"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0"
+                Orientation="Horizontal">
+      <Button Command="{Binding ResumeCommand}"
+              Content="Resume in console"
+              MinWidth="132" />
+      <Button Click="CloseButton_Click"
+              Content="Close"
+              Margin="8,0,0,0"
+              MinWidth="88" />
+    </StackPanel>
+  </Grid>
+</Window>

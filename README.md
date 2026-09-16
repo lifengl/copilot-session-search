@@ -1,0 +1,53 @@
+# Copilot Session Search
+
+A small Windows application for searching local GitHub Copilot CLI conversation history.
+
+## Features
+
+- Searches visible user and final Copilot messages using case-insensitive literal text matching.
+- Reads session metadata and persisted events through the public `GitHub.Copilot.SDK`.
+- Processes up to four sessions concurrently and adds matching sessions to the result list as they complete.
+- Keeps results ordered by last activity, newest first.
+- Shows up to three excerpts for each session in the main window.
+- Opens modeless detail windows containing every matching section and longer surrounding text.
+- Cancels an active search without removing results that have already been found.
+- Opens a new Windows Terminal or PowerShell window and resumes a selected session.
+
+## Requirements
+
+- Windows
+- .NET 10 SDK
+- GitHub Copilot CLI local session history under `COPILOT_HOME` or `%USERPROFILE%\.copilot`
+- A signed-in GitHub Copilot CLI environment
+
+## Build and run
+
+```powershell
+Set-Location Q:\ws\CopilotSessionSearch
+dotnet build CopilotSessionSearch.sln
+dotnet run --project src\CopilotSessionSearch\CopilotSessionSearch.csproj
+```
+
+Run the tests with:
+
+```powershell
+dotnet test CopilotSessionSearch.sln
+```
+
+## Search behavior
+
+The application takes a snapshot of the available session list when the first search starts. It does not subscribe to session lifecycle updates, so sessions created or modified afterward appear after restarting the application.
+
+Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window shows every matching section.
+
+## Copilot SDK usage
+
+Stable SDK APIs provide session listing and metadata. Persisted history is read through `CopilotClient.Rpc.Sessions.ReadPersistedEventsAsync`, which is public and strongly typed but currently marked experimental by the SDK. Its `GHCP001` warning suppression is intentionally limited to `CopilotSdkSessionHistorySource`.
+
+The application never sends a prompt, resumes a session inside the SDK, deletes a session, or writes conversation data. The **Resume in console** action starts:
+
+```text
+copilot --resume=<session-id>
+```
+
+Direct SQLite access is not currently used. It remains a possible fallback if the SDK no longer exposes the required local-history data.
