@@ -6,6 +6,7 @@
         Icon="../Assets/CopilotSessionSearch.ico"
         MinHeight="520"
         MinWidth="760"
+        PreviewKeyDown="SessionDetailsWindow_PreviewKeyDown"
         Title="{Binding Name, StringFormat=Session details - {0}}"
         Width="1080"
         WindowStartupLocation="CenterOwner">
@@ -165,7 +166,7 @@
         <TextBlock Grid.Row="8"
                    Grid.ColumnSpan="2"
                    Margin="0,8,0,0"
-                   Text="Use arrow or paging keys to navigate messages. Press Enter to focus rendered text, then Escape to return to the list. The mouse wheel moves between messages; use a message's scrollbar for long content."
+                   Text="Use arrow or paging keys to navigate messages. Press Enter to focus rendered text. Escape closes this window. The mouse wheel moves between messages; use a message's scrollbar for long content."
                    TextWrapping="Wrap" />
       </Grid>
     </Border>

@@ -40,11 +40,13 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectThemeCommand.Execute(viewModel.DarkThemeOption);
         Assert.Equal(AppThemePreference.Dark, themeService.CurrentPreference);
         Assert.True(viewModel.IsDarkTheme);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
 
         Assert.True(viewModel.IsSearching);
+        Assert.True(viewModel.CancelCommand.CanExecute(null));
 
         SessionSearchResult? openedResult = null;
         viewModel.OpenDetailsRequested += result => openedResult = result;
@@ -55,6 +57,7 @@ public sealed class MainWindowViewModelTests
         await searchTask;
 
         Assert.False(viewModel.IsSearching);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
         Assert.NotNull(viewModel.SelectedResult);
         Assert.Equal(3, viewModel.CompletedSessionCount);
         Assert.Equal(3, viewModel.TotalSessionCount);

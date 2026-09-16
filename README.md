@@ -55,7 +55,8 @@ Markdown image syntax is converted into an ordinary link before rendering, and r
 - `Alt+S` starts a search, `Alt+C` cancels an active search, and `Escape` also cancels.
 - In either result list, `Up`, `Down`, `Page Up`, `Page Down`, `Home`, and `End` change selection and bring the selected item into view.
 - `Enter` on a session opens its detail window.
-- `Enter` on a detail message focuses its rendered Markdown; `Escape` returns focus to the message list.
+- `Enter` on a detail message focuses its rendered Markdown.
+- `Escape` closes the detail window from the message list, rendered Markdown, or footer buttons.
 - `Ctrl+C` on a selected detail message copies the full original Markdown. When rendered text has focus, `Ctrl+C` copies the selected text instead.
 - In the detail window, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
 - The mouse wheel over rendered Markdown scrolls the message list. Long messages keep their own scrollbar for direct scrolling.

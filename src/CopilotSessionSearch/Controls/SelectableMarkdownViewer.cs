@@ -63,17 +63,6 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
-        {
-            ListViewItem? item = FindVisualAncestor<ListViewItem>(this);
-            if (item is not null)
-            {
-                item.Focus();
-                e.Handled = true;
-                return;
-            }
-        }
-
         if (Keyboard.Modifiers == ModifierKeys.None
             && IsListNavigationKey(e.Key))
         {

@@ -25,6 +25,18 @@ public partial class SessionDetailsWindow : Window
         FocusSelectedMessage();
     }
 
+    private void SessionDetailsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape
+            || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        Close();
+    }
+
     private void MessagesListView_PreviewMouseLeftButtonDown(
         object sender,
         MouseButtonEventArgs e)
