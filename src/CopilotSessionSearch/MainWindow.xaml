@@ -105,14 +105,35 @@
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="SearchTextBox"
-                 AutomationProperties.Name="Search conversation history"
-                 MinHeight="30"
-                 Padding="8,4"
-                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
-                 TabIndex="0"
-                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                 ToolTip="Search conversation history (Ctrl+F)" />
+        <Grid>
+          <TextBox x:Name="SearchTextBox"
+                   AutomationProperties.HelpText="Type a pull request ID, bug ID, or words from an earlier Copilot conversation"
+                   AutomationProperties.Name="Search conversation history"
+                   MinHeight="30"
+                   Padding="8,4"
+                   PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                   TabIndex="0"
+                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="Search conversation history (Ctrl+F)" />
+          <TextBlock Foreground="{Binding Foreground, ElementName=SearchTextBox}"
+                     IsHitTestVisible="False"
+                     Margin="9,0,9,0"
+                     Opacity="0.55"
+                     Text="Search conversations (for example, PR 123456, bug 789012, or a phrase)"
+                     TextTrimming="CharacterEllipsis"
+                     VerticalAlignment="Center">
+            <TextBlock.Style>
+              <Style TargetType="{x:Type TextBlock}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding SearchText}" Value="">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </Grid>
         <Button Grid.Column="1"
                 AutomationProperties.Name="Search"
                 Command="{Binding SearchCommand}"

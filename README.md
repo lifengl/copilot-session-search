@@ -17,6 +17,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Supports and persists System, Light, and Dark Fluent themes.
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
+- Shows an example watermark in the empty search field for first-time guidance.
 
 ## Requirements
 
