@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:CopilotSessionSearch.Controls"
         Height="780"
+        Icon="../Assets/CopilotSessionSearch.ico"
         MinHeight="520"
         MinWidth="760"
         Title="{Binding Name, StringFormat=Session details - {0}}"

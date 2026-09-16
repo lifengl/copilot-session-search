@@ -48,6 +48,15 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.SystemKey == Key.T
+            && Keyboard.Modifiers == ModifierKeys.Alt)
+        {
+            ThemeMenuButton.Focus();
+            OpenThemeMenu();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.F
             || Keyboard.Modifiers != ModifierKeys.Control)
         {
@@ -57,6 +66,22 @@ public partial class MainWindow : Window
         SearchTextBox.Focus();
         SearchTextBox.SelectAll();
         e.Handled = true;
+    }
+
+    private void ThemeMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenThemeMenu();
+    }
+
+    private void OpenThemeMenu()
+    {
+        if (ThemeMenuButton.ContextMenu is not ContextMenu contextMenu)
+        {
+            return;
+        }
+
+        contextMenu.PlacementTarget = ThemeMenuButton;
+        contextMenu.IsOpen = true;
     }
 
     private async void SearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)

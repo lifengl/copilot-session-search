@@ -37,9 +37,9 @@ public sealed class MainWindowViewModelTests
         };
 
         Assert.Equal(AppThemePreference.System, viewModel.SelectedThemeOption.Preference);
-        viewModel.SelectedThemeOption = viewModel.ThemeOptions.Single(
-            option => option.Preference == AppThemePreference.Dark);
+        viewModel.SelectThemeCommand.Execute(viewModel.DarkThemeOption);
         Assert.Equal(AppThemePreference.Dark, themeService.CurrentPreference);
+        Assert.True(viewModel.IsDarkTheme);
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
@@ -56,6 +56,10 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.IsSearching);
         Assert.NotNull(viewModel.SelectedResult);
+        Assert.Equal(3, viewModel.CompletedSessionCount);
+        Assert.Equal(3, viewModel.TotalSessionCount);
+        Assert.Equal(3, viewModel.MatchingSessionCount);
+        Assert.Equal("3 matched sessions", viewModel.MatchSummaryText);
         Assert.Equal(
             [newest.SessionId, middle.SessionId, oldest.SessionId],
             viewModel.Results.Select(result => result.Result.Session.SessionId));

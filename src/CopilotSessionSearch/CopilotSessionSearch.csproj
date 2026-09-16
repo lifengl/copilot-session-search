@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <ApplicationIcon>Assets\CopilotSessionSearch.ico</ApplicationIcon>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
@@ -12,6 +13,10 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="GitHub.Copilot.SDK" Version="1.0.14" />
     <PackageReference Include="MdXaml" Version="1.27.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\CopilotSessionSearch.ico" />
   </ItemGroup>
 
 </Project>

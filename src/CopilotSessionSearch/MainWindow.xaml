@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:CopilotSessionSearch.Controls"
         Height="720"
+        Icon="Assets/CopilotSessionSearch.ico"
         MinHeight="480"
         MinWidth="720"
         PreviewKeyDown="MainWindow_PreviewKeyDown"
@@ -84,101 +85,181 @@
     <KeyBinding Command="{Binding CancelCommand}" Key="Escape" />
   </Window.InputBindings>
 
-  <Grid Margin="16">
+  <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <Grid>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
+    <Grid Margin="16,16,16,8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
 
-      <TextBox x:Name="SearchTextBox"
-               AutomationProperties.Name="Search conversation history"
-               MinHeight="30"
-               Padding="8,4"
-               PreviewKeyDown="SearchTextBox_PreviewKeyDown"
-               TabIndex="0"
-               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-               ToolTip="Search conversation history (Ctrl+F)" />
-      <Button Grid.Column="1"
-              Command="{Binding SearchCommand}"
-              Content="_Search"
-              IsDefault="True"
-              Margin="8,0,0,0"
-              MinWidth="88"
-              TabIndex="1"
-              ToolTip="Search (Enter or Alt+S)" />
-      <Button Grid.Column="2"
-              Command="{Binding CancelCommand}"
-              Content="_Cancel"
-              Margin="8,0,0,0"
-              MinWidth="88"
-              TabIndex="2"
-              ToolTip="Cancel search (Escape or Alt+C)" />
-      <Label x:Name="ThemeLabel"
-             Grid.Column="3"
-             Content="_Theme:"
-             Margin="16,0,4,0"
-             Target="{Binding ElementName=ThemeComboBox}"
-             VerticalContentAlignment="Center" />
-      <ComboBox x:Name="ThemeComboBox"
-                Grid.Column="4"
-                AutomationProperties.LabeledBy="{Binding ElementName=ThemeLabel}"
-                DisplayMemberPath="DisplayName"
-                ItemsSource="{Binding ThemeOptions, Mode=OneTime}"
-                MinWidth="104"
-                SelectedItem="{Binding SelectedThemeOption}"
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <TextBox x:Name="SearchTextBox"
+                 AutomationProperties.Name="Search conversation history"
+                 MinHeight="30"
+                 Padding="8,4"
+                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                 TabIndex="0"
+                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                 ToolTip="Search conversation history (Ctrl+F)" />
+        <Button Grid.Column="1"
+                Command="{Binding SearchCommand}"
+                Content="_Search"
+                IsDefault="True"
+                Margin="8,0,0,0"
+                MinWidth="88"
+                TabIndex="1"
+                ToolTip="Search (Enter or Alt+S)" />
+        <Button Grid.Column="2"
+                Command="{Binding CancelCommand}"
+                Content="_Cancel"
+                Margin="8,0,0,0"
+                MinWidth="88"
+                TabIndex="2"
+                ToolTip="Cancel search (Escape or Alt+C)" />
+      </Grid>
+
+      <TextBlock Grid.Row="1"
+                 AutomationProperties.LiveSetting="Assertive"
+                 FontWeight="SemiBold"
+                 Margin="0,10,0,0"
+                 Text="{Binding ErrorMessage}">
+        <TextBlock.Style>
+          <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+
+      <ListView x:Name="SearchResultsListView"
+                Grid.Row="2"
+                AutomationProperties.Name="Matching Copilot sessions"
+                ItemContainerStyle="{StaticResource SearchResultItemStyle}"
+                ItemTemplate="{StaticResource SearchResultTemplate}"
+                ItemsSource="{Binding Results}"
+                KeyboardNavigation.TabNavigation="Once"
+                Margin="0,12,0,0"
+                PreviewKeyDown="SearchResultsListView_PreviewKeyDown"
+                ScrollViewer.CanContentScroll="True"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                SelectedItem="{Binding SelectedResult}"
+                SelectionMode="Single"
                 TabIndex="3"
-                ToolTip="Follow Windows or force a light or dark theme" />
+                VirtualizingPanel.IsVirtualizing="True"
+                VirtualizingPanel.VirtualizationMode="Recycling" />
+
     </Grid>
 
-    <TextBlock Grid.Row="1"
-               AutomationProperties.LiveSetting="Assertive"
-               Margin="0,10,0,0"
-               Text="{Binding StatusText}" />
+    <StatusBar Grid.Row="1"
+               Height="24"
+               Padding="0">
+      <StatusBarItem HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Stretch"
+                     Padding="8,0"
+                     VerticalContentAlignment="Center">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
 
-    <TextBlock Grid.Row="2"
-               AutomationProperties.LiveSetting="Assertive"
-               FontWeight="SemiBold"
-               Margin="0,6,0,0"
-               Text="{Binding ErrorMessage}">
-      <TextBlock.Style>
-        <Style TargetType="{x:Type TextBlock}">
-          <Setter Property="Visibility" Value="Visible" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
-              <Setter Property="Visibility" Value="Collapsed" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </TextBlock.Style>
-    </TextBlock>
+          <TextBlock AutomationProperties.LiveSetting="Polite"
+                     FontSize="12"
+                     Text="{Binding StatusText}"
+                     TextTrimming="CharacterEllipsis"
+                     VerticalAlignment="Center" />
 
-    <ListView x:Name="SearchResultsListView"
-              Grid.Row="3"
-              AutomationProperties.Name="Matching Copilot sessions"
-              ItemContainerStyle="{StaticResource SearchResultItemStyle}"
-              ItemTemplate="{StaticResource SearchResultTemplate}"
-              ItemsSource="{Binding Results}"
-              KeyboardNavigation.TabNavigation="Once"
-              Margin="0,12,0,0"
-              PreviewKeyDown="SearchResultsListView_PreviewKeyDown"
-              ScrollViewer.CanContentScroll="True"
-              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-              ScrollViewer.VerticalScrollBarVisibility="Auto"
-              SelectedItem="{Binding SelectedResult}"
-              SelectionMode="Single"
-              TabIndex="4"
-              VirtualizingPanel.IsVirtualizing="True"
-              VirtualizingPanel.VirtualizationMode="Recycling" />
+          <ProgressBar Grid.Column="1"
+                       AutomationProperties.Name="Session search progress"
+                       Height="3"
+                       Margin="12,0,0,0"
+                       Maximum="{Binding TotalSessionCount}"
+                       Value="{Binding CompletedSessionCount}"
+                       VerticalAlignment="Center"
+                       Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       Width="96" />
+
+          <TextBlock Grid.Column="2"
+                     AutomationProperties.LiveSetting="Polite"
+                     FontSize="12"
+                     Margin="12,0,0,0"
+                     Text="{Binding MatchSummaryText}"
+                     VerticalAlignment="Center" />
+
+          <Button x:Name="ThemeMenuButton"
+                  Grid.Column="3"
+                  AutomationProperties.HelpText="Switch between System, Light, and Dark themes"
+                  AutomationProperties.Name="{Binding ThemeMenuText}"
+                  Click="ThemeMenuButton_Click"
+                  Margin="8,0,0,0"
+                  MinHeight="20"
+                  MinWidth="26"
+                  Padding="4,1"
+                  TabIndex="4"
+                  ToolTip="{Binding ThemeMenuText}">
+            <Button.ContextMenu>
+              <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Command="{Binding SelectThemeCommand}"
+                          CommandParameter="{Binding SystemThemeOption}"
+                          Header="_System"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsSystemTheme, Mode=OneWay}">
+                  <MenuItem.Icon>
+                    <controls:ThemeGlyph Height="14"
+                                         Preference="System"
+                                         Width="14" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Command="{Binding SelectThemeCommand}"
+                          CommandParameter="{Binding LightThemeOption}"
+                          Header="_Light"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsLightTheme, Mode=OneWay}">
+                  <MenuItem.Icon>
+                    <controls:ThemeGlyph Height="14"
+                                         Preference="Light"
+                                         Width="14" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Command="{Binding SelectThemeCommand}"
+                          CommandParameter="{Binding DarkThemeOption}"
+                          Header="_Dark"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsDarkTheme, Mode=OneWay}">
+                  <MenuItem.Icon>
+                    <controls:ThemeGlyph Height="14"
+                                         Preference="Dark"
+                                         Width="14" />
+                  </MenuItem.Icon>
+                </MenuItem>
+              </ContextMenu>
+            </Button.ContextMenu>
+            <controls:ThemeGlyph Height="14"
+                                 IsHitTestVisible="False"
+                                 Preference="{Binding SelectedThemeOption.Preference}"
+                                 Width="14" />
+          </Button>
+        </Grid>
+      </StatusBarItem>
+    </StatusBar>
   </Grid>
 </Window>

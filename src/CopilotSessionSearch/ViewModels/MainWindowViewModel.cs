@@ -37,7 +37,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private SessionSearchResultViewModel? _selectedResult;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeMenuText))]
     private ThemeOption _selectedThemeOption;
+
+    [ObservableProperty]
+    private int _completedSessionCount;
+
+    [ObservableProperty]
+    private int _totalSessionCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchSummaryText))]
+    private int _matchingSessionCount;
 
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
@@ -57,6 +68,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             new ThemeOption(AppThemePreference.Light, "Light"),
             new ThemeOption(AppThemePreference.Dark, "Dark"),
         ];
+        SystemThemeOption = ThemeOptions[0];
+        LightThemeOption = ThemeOptions[1];
+        DarkThemeOption = ThemeOptions[2];
         _selectedThemeOption = ThemeOptions.Single(
             option => option.Preference == themeService.CurrentPreference);
     }
@@ -67,9 +81,33 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     public IReadOnlyList<ThemeOption> ThemeOptions { get; }
 
+    public ThemeOption SystemThemeOption { get; }
+
+    public ThemeOption LightThemeOption { get; }
+
+    public ThemeOption DarkThemeOption { get; }
+
+    public bool IsSystemTheme =>
+        SelectedThemeOption.Preference == AppThemePreference.System;
+
+    public bool IsLightTheme =>
+        SelectedThemeOption.Preference == AppThemePreference.Light;
+
+    public bool IsDarkTheme =>
+        SelectedThemeOption.Preference == AppThemePreference.Dark;
+
+    public string ThemeMenuText => $"Theme: {SelectedThemeOption.DisplayName}";
+
+    public string MatchSummaryText => MatchingSessionCount == 1
+        ? "1 matched session"
+        : $"{MatchingSessionCount:N0} matched sessions";
+
     partial void OnSelectedThemeOptionChanged(ThemeOption value)
     {
         _themeService.Apply(value.Preference);
+        OnPropertyChanged(nameof(IsSystemTheme));
+        OnPropertyChanged(nameof(IsLightTheme));
+        OnPropertyChanged(nameof(IsDarkTheme));
     }
 
     private bool CanSearch()
@@ -106,6 +144,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         }
     }
 
+    [RelayCommand]
+    private void SelectTheme(ThemeOption? option)
+    {
+        if (option is not null)
+        {
+            SelectedThemeOption = option;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -139,6 +186,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         Results.Clear();
         SelectedResult = null;
         _latestProgress = new SessionSearchProgress(0, 0, 0, 0);
+        UpdateProgress(_latestProgress);
         StatusText = "Loading the session list...";
 
         try
@@ -148,6 +196,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 cancellationSource.Token))
             {
                 _latestProgress = update.Progress;
+                UpdateProgress(update.Progress);
 
                 if (update.Result is not null)
                 {
@@ -166,15 +215,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
             StatusText = _latestProgress.TotalSessions == 0
                 ? "No local Copilot sessions were found."
-                : $"Search complete. Found {_latestProgress.MatchingSessions:N0} matching session(s) " +
-                  $"out of {_latestProgress.TotalSessions:N0}.";
+                : $"Search complete. Searched {_latestProgress.TotalSessions:N0} sessions.";
         }
         catch (OperationCanceledException) when (cancellationSource.IsCancellationRequested)
         {
             StatusText =
                 $"Search canceled after {_latestProgress.CompletedSessions:N0} of " +
-                $"{_latestProgress.TotalSessions:N0} sessions. " +
-                $"{Results.Count:N0} result(s) remain available.";
+                $"{_latestProgress.TotalSessions:N0} sessions.";
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -210,10 +257,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         }
     }
 
+    private void UpdateProgress(SessionSearchProgress progress)
+    {
+        CompletedSessionCount = progress.CompletedSessions;
+        TotalSessionCount = progress.TotalSessions;
+        MatchingSessionCount = progress.MatchingSessions;
+    }
+
     private static string FormatProgress(SessionSearchProgress progress)
     {
         return
             $"Searched {progress.CompletedSessions:N0} of {progress.TotalSessions:N0} sessions - " +
-            $"{progress.MatchingSessions:N0} matching, {progress.FailedSessions:N0} failed.";
+            $"{progress.FailedSessions:N0} failed.";
     }
 }

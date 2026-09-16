@@ -14,6 +14,8 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
 - Supports System, Light, and Dark Fluent themes.
+- Uses an original AI-search icon for the executable, taskbar, and application windows.
+- Shows live search status, progress, and matched-session totals in a bottom status bar.
 
 ## Requirements
 
@@ -62,11 +64,31 @@ Markdown image syntax is converted into an ordinary link before rendering, and r
 
 The theme selector defaults to **System** each time the application starts. System mode follows the current Windows app theme and updates automatically when Windows changes between light, dark, or high-contrast modes.
 
-Selecting **Light** or **Dark** applies that Fluent theme immediately to the main window, open detail windows, controls, scrollbars, selection visuals, and rendered Markdown text. Select **System** again to resume following Windows. `Alt+T` focuses the theme selector.
+Selecting **Light** or **Dark** applies that Fluent theme immediately to the main window, open detail windows, controls, scrollbars, selection visuals, and rendered Markdown text. Select **System** again to resume following Windows. `Alt+T` opens the theme menu.
 
 Theme support uses the built-in .NET 10 WPF `Application.ThemeMode` API. This API is currently marked experimental by WPF, and its `WPF0001` warning suppression is isolated to `ThemeService`.
 
 MdXaml emits some fixed light-theme colors, so `SelectableMarkdownViewer` normalizes headings, tables, code backgrounds, links, and other text elements against the active WPF foreground. This avoids white table rows and black headings when the application is dark.
+
+## Status bar
+
+The bottom status bar keeps secondary information out of the primary search row. It contains:
+
+- Current search state and completed-session progress.
+- A determinate progress indicator while searching.
+- The total number of matched sessions.
+- A compact icon-only theme button. Its menu shows monitor **System**, sun **Light**, and crescent **Dark** choices with text and checkmarks.
+
+## Application icon
+
+The icon is an original assistant-bubble and magnifying-glass design stored as a ten-frame `.ico` for 16 through 256 pixel display sizes. The executable and both windows use `Assets\CopilotSessionSearch.ico`.
+
+Regenerate the icon and PNG preview with PowerShell 7:
+
+```powershell
+Set-Location Q:\ws\CopilotSessionSearch
+pwsh -File tools\Generate-AppIcon.ps1
+```
 
 ## Copilot SDK usage
 
