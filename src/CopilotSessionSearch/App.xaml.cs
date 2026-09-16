@@ -18,7 +18,10 @@ public partial class App : Application
                 new SessionDocumentCache(),
                 new SessionSearchService());
             var viewModel = new MainWindowViewModel(searchCoordinator, historySource);
-            var window = new MainWindow(viewModel, new ConsoleLauncher());
+            var window = new MainWindow(
+                viewModel,
+                new ConsoleLauncher(),
+                new ClipboardService());
 
             MainWindow = window;
             window.Show();

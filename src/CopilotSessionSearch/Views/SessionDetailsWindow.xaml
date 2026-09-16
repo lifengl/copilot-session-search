@@ -9,13 +9,16 @@
         Width="1080"
         WindowStartupLocation="CenterOwner">
   <Window.Resources>
-    <DataTemplate x:Key="DetailSectionTemplate">
+    <DataTemplate x:Key="DetailMessageTemplate">
       <Grid Margin="4">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
         <TextBlock FontWeight="SemiBold">
           <Run Text="{Binding SpeakerText, Mode=OneTime}" />
@@ -27,21 +30,28 @@
           <Run Text="{Binding OccurrenceText, Mode=OneTime}" />
         </TextBlock>
 
-        <controls:HighlightedTextBlock Grid.Row="1"
-                                       HighlightText="{Binding Query, Mode=OneTime}"
-                                       Margin="0,6,0,0"
-                                       SourceText="{Binding DetailText, Mode=OneTime}"
-                                       TextWrapping="Wrap" />
+        <Button Grid.Column="1"
+                Command="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType={x:Type ListView}}}"
+                CommandParameter="{Binding}"
+                Content="Copy full message"
+                Margin="12,0,0,0" />
 
-        <Expander Grid.Row="2"
-                  Header="Show full message"
-                  Margin="0,8,0,0"
-                  Visibility="{Binding HasAdditionalText, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneTime}">
-          <controls:HighlightedTextBlock HighlightText="{Binding Query, Mode=OneTime}"
-                                         Margin="0,6,0,0"
-                                         SourceText="{Binding FullText, Mode=OneTime}"
-                                         TextWrapping="Wrap" />
-        </Expander>
+        <Border Grid.Row="1"
+                Grid.ColumnSpan="2"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                BorderThickness="1"
+                Margin="0,8,0,0"
+                Padding="8">
+          <controls:SelectableMarkdownViewer AutomationProperties.Name="Rendered conversation message"
+                                             HighlightText="{Binding Query, Mode=OneTime}"
+                                             HorizontalScrollBarVisibility="Auto"
+                                             IsSelectionEnabled="True"
+                                             IsToolBarVisible="False"
+                                             MaxHeight="620"
+                                             MinHeight="72"
+                                             SourceMarkdown="{Binding MarkdownText, Mode=OneTime}"
+                                             VerticalScrollBarVisibility="Auto" />
+        </Border>
       </Grid>
     </DataTemplate>
 
@@ -65,6 +75,7 @@
             Padding="12">
       <Grid>
         <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
@@ -156,36 +167,55 @@
           <Run Text=" - " />
           <Run Text="{Binding MatchCountText, Mode=OneTime}" />
         </TextBlock>
+
+        <TextBlock Grid.Row="8"
+                   Grid.ColumnSpan="2"
+                   Margin="0,8,0,0"
+                   Text="Select rendered text and press Ctrl+C, use its context menu, or copy the full message."
+                   TextWrapping="Wrap" />
       </Grid>
     </Border>
 
     <ListView Grid.Row="1"
-              AutomationProperties.Name="Matching conversation sections"
+              AutomationProperties.Name="Matching conversation messages"
               ItemContainerStyle="{StaticResource DetailItemStyle}"
-              ItemTemplate="{StaticResource DetailSectionTemplate}"
-              ItemsSource="{Binding Sections}"
+              ItemTemplate="{StaticResource DetailMessageTemplate}"
+              ItemsSource="{Binding Messages}"
               Margin="0,12,0,0"
               ScrollViewer.CanContentScroll="True"
               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
               VirtualizingPanel.IsVirtualizing="True"
               VirtualizingPanel.VirtualizationMode="Recycling" />
 
-    <TextBlock Grid.Row="2"
-               AutomationProperties.LiveSetting="Assertive"
-               FontWeight="SemiBold"
-               Margin="0,8,0,0"
-               Text="{Binding ErrorMessage}">
-      <TextBlock.Style>
-        <Style TargetType="{x:Type TextBlock}">
-          <Setter Property="Visibility" Value="Visible" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
-              <Setter Property="Visibility" Value="Collapsed" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </TextBlock.Style>
-    </TextBlock>
+    <StackPanel Grid.Row="2" Margin="0,8,0,0">
+      <TextBlock AutomationProperties.LiveSetting="Polite"
+                 Text="{Binding StatusMessage}">
+        <TextBlock.Style>
+          <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding StatusMessage}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+      <TextBlock AutomationProperties.LiveSetting="Assertive"
+                 FontWeight="SemiBold"
+                 Text="{Binding ErrorMessage}">
+        <TextBlock.Style>
+          <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+    </StackPanel>
 
     <StackPanel Grid.Row="3"
                 HorizontalAlignment="Right"

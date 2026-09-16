@@ -11,21 +11,25 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly IConsoleLauncher _consoleLauncher;
+    private readonly IClipboardService _clipboardService;
     private readonly Dictionary<string, SessionDetailsWindow> _detailWindows =
         new(StringComparer.Ordinal);
     private bool _allowClose;
 
     public MainWindow(
         MainWindowViewModel viewModel,
-        IConsoleLauncher consoleLauncher)
+        IConsoleLauncher consoleLauncher,
+        IClipboardService clipboardService)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(consoleLauncher);
+        ArgumentNullException.ThrowIfNull(clipboardService);
 
         InitializeComponent();
 
         _viewModel = viewModel;
         _consoleLauncher = consoleLauncher;
+        _clipboardService = clipboardService;
         DataContext = viewModel;
 
         _viewModel.OpenDetailsRequested += ShowDetails;
@@ -48,7 +52,10 @@ public partial class MainWindow : Window
         }
 
         var detailsWindow = new SessionDetailsWindow(
-            new SessionDetailsViewModel(result, _consoleLauncher))
+            new SessionDetailsViewModel(
+                result,
+                _consoleLauncher,
+                _clipboardService))
         {
             Owner = this,
         };

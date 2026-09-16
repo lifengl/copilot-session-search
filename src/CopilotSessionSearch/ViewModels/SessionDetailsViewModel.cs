@@ -2,6 +2,7 @@
 
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopilotSessionSearch.Models;
@@ -12,21 +13,33 @@ namespace CopilotSessionSearch.ViewModels;
 public sealed partial class SessionDetailsViewModel : ObservableObject
 {
     private readonly IConsoleLauncher _consoleLauncher;
+    private readonly IClipboardService _clipboardService;
 
     [ObservableProperty]
     private string? _errorMessage;
 
+    [ObservableProperty]
+    private string? _statusMessage;
+
     public SessionDetailsViewModel(
         SessionSearchResult result,
-        IConsoleLauncher consoleLauncher)
+        IConsoleLauncher consoleLauncher,
+        IClipboardService clipboardService)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(consoleLauncher);
+        ArgumentNullException.ThrowIfNull(clipboardService);
 
         Result = result;
         _consoleLauncher = consoleLauncher;
-        Sections = result.Sections
-            .Select(section => new MatchSectionViewModel(section, result.Query))
+        _clipboardService = clipboardService;
+        Messages = result.Sections
+            .GroupBy(section => section.EntryId, StringComparer.Ordinal)
+            .Select(
+                group => new SessionDetailMessageViewModel(
+                    group.ToArray(),
+                    result.Query))
+            .OrderBy(message => message.MessageNumber)
             .ToArray();
     }
 
@@ -76,7 +89,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         "match",
         "matches");
 
-    public IReadOnlyList<MatchSectionViewModel> Sections { get; }
+    public IReadOnlyList<SessionDetailMessageViewModel> Messages { get; }
 
     [RelayCommand]
     private void Resume()
@@ -85,6 +98,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         {
             _consoleLauncher.ResumeSession(Result.Session);
             ErrorMessage = null;
+            StatusMessage = null;
         }
         catch (Exception ex) when (
             ex is Win32Exception
@@ -93,6 +107,28 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
             or UnauthorizedAccessException)
         {
             ErrorMessage = $"Unable to resume the session: {ex.Message}";
+            StatusMessage = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CopyMessage(SessionDetailMessageViewModel? message)
+    {
+        if (message is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _clipboardService.SetText(message.MarkdownText);
+            ErrorMessage = null;
+            StatusMessage = "The full message was copied to the clipboard.";
+        }
+        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
+        {
+            ErrorMessage = $"Unable to copy the message: {ex.Message}";
+            StatusMessage = null;
         }
     }
 }

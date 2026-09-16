@@ -9,7 +9,8 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Processes up to four sessions concurrently and adds matching sessions to the result list as they complete.
 - Keeps results ordered by last activity, newest first.
 - Shows up to three excerpts for each session in the main window.
-- Opens modeless detail windows containing every matching section and longer surrounding text.
+- Opens modeless detail windows containing every matching message rendered as Markdown.
+- Supports selecting and copying rendered text, plus a one-click copy of each full message.
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
 
@@ -38,7 +39,11 @@ dotnet test CopilotSessionSearch.sln
 
 The application takes a snapshot of the available session list when the first search starts. It does not subscribe to session lifecycle updates, so sessions created or modified afterward appear after restarting the application.
 
-Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window shows every matching section.
+Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window groups matching sections by conversation message and shows every matching message.
+
+Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` content. Headings, tables, lists, links, inline code, and fenced code blocks receive Markdown formatting. Select text and press Ctrl+C, use the document context menu, or choose **Copy full message**.
+
+Markdown image syntax is converted into an ordinary link before rendering, and raw HTML image elements are escaped. This prevents the viewer from automatically fetching remote or local image content.
 
 ## Copilot SDK usage
 
