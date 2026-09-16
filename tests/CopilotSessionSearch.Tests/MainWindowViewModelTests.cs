@@ -28,10 +28,12 @@ public sealed class MainWindowViewModelTests
             new SessionSearchService(),
             maximumConcurrency: 2);
         var themeService = new RecordingThemeService();
+        var themePreferenceStore = new RecordingThemePreferenceStore();
         var viewModel = new MainWindowViewModel(
             coordinator,
             historySource,
-            themeService)
+            themeService,
+            themePreferenceStore)
         {
             SearchText = "needle",
         };
@@ -39,6 +41,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(AppThemePreference.System, viewModel.SelectedThemeOption.Preference);
         viewModel.SelectThemeCommand.Execute(viewModel.DarkThemeOption);
         Assert.Equal(AppThemePreference.Dark, themeService.CurrentPreference);
+        Assert.Equal(AppThemePreference.Dark, themePreferenceStore.SavedPreference);
         Assert.True(viewModel.IsDarkTheme);
         Assert.False(viewModel.CancelCommand.CanExecute(null));
 
@@ -149,6 +152,21 @@ public sealed class MainWindowViewModelTests
         public void Apply(AppThemePreference preference)
         {
             CurrentPreference = preference;
+        }
+    }
+
+    private sealed class RecordingThemePreferenceStore : IThemePreferenceStore
+    {
+        public AppThemePreference? SavedPreference { get; private set; }
+
+        public AppThemePreference? Load()
+        {
+            return SavedPreference;
+        }
+
+        public void Save(AppThemePreference preference)
+        {
+            SavedPreference = preference;
         }
     }
 }

@@ -14,7 +14,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Makes session metadata and the shell-ready resume command directly selectable.
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
-- Supports System, Light, and Dark Fluent themes.
+- Supports and persists System, Light, and Dark Fluent themes.
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 
@@ -67,11 +67,13 @@ Session name, ID, working directory, repository, dates, span, search query, and 
 
 ## Theme
 
-The theme selector defaults to **System** each time the application starts. System mode follows the current Windows app theme and updates automatically when Windows changes between light, dark, or high-contrast modes.
+The first run defaults to **System**. After the user selects System, Light, or Dark, that preference is saved for the current Windows user and restored before the main window is shown on later launches. System mode follows the current Windows app theme and updates automatically when Windows changes between light, dark, or high-contrast modes.
 
 Selecting **Light** or **Dark** applies that Fluent theme immediately to the main window, open detail windows, controls, scrollbars, selection visuals, and rendered Markdown text. Select **System** again to resume following Windows. `Alt+T` opens the theme menu.
 
 Theme support uses the built-in .NET 10 WPF `Application.ThemeMode` API. This API is currently marked experimental by WPF, and its `WPF0001` warning suppression is isolated to `ThemeService`.
+
+The preference is stored atomically as readable JSON at `%LOCALAPPDATA%\CopilotSessionSearch\settings.json`. An unreadable or invalid file produces a warning and falls back to System instead of preventing the application from starting.
 
 MdXaml emits some fixed light-theme colors, so `SelectableMarkdownViewer` normalizes headings, tables, code backgrounds, links, and other text elements against the active WPF foreground. This avoids white table rows and black headings when the application is dark.
 

@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopilotSessionSearch.Models;
@@ -12,6 +13,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 {
     private readonly SessionSearchCoordinator _searchCoordinator;
     private readonly ISessionHistorySource _historySource;
+    private readonly IThemePreferenceStore _themePreferenceStore;
     private readonly IThemeService _themeService;
     private CancellationTokenSource? _searchCancellationSource;
     private Task _activeSearchTask = Task.CompletedTask;
@@ -53,15 +55,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
         ISessionHistorySource historySource,
-        IThemeService themeService)
+        IThemeService themeService,
+        IThemePreferenceStore themePreferenceStore)
     {
         ArgumentNullException.ThrowIfNull(searchCoordinator);
         ArgumentNullException.ThrowIfNull(historySource);
         ArgumentNullException.ThrowIfNull(themeService);
+        ArgumentNullException.ThrowIfNull(themePreferenceStore);
 
         _searchCoordinator = searchCoordinator;
         _historySource = historySource;
         _themeService = themeService;
+        _themePreferenceStore = themePreferenceStore;
         ThemeOptions =
         [
             new ThemeOption(AppThemePreference.System, "System"),
@@ -105,6 +110,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     partial void OnSelectedThemeOptionChanged(ThemeOption value)
     {
         _themeService.Apply(value.Preference);
+        try
+        {
+            _themePreferenceStore.Save(value.Preference);
+            StatusText = $"{value.DisplayName} theme selected.";
+        }
+        catch (Exception ex) when (
+            ex is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+        {
+            ErrorMessage =
+                $"{value.DisplayName} theme is active for this run, " +
+                $"but the preference could not be saved: {ex.Message}";
+            StatusText = "The theme preference could not be saved.";
+        }
+
         OnPropertyChanged(nameof(IsSystemTheme));
         OnPropertyChanged(nameof(IsLightTheme));
         OnPropertyChanged(nameof(IsDarkTheme));
