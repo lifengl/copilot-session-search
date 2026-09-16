@@ -52,9 +52,11 @@ public sealed class SessionDetailsViewModelTests
             clipboardService);
 
         Assert.Equal(2, viewModel.Messages.Count);
+        Assert.Same(viewModel.Messages[0], viewModel.SelectedMessage);
         Assert.Equal(3, viewModel.Messages[0].OccurrenceCount);
 
-        viewModel.CopyMessageCommand.Execute(viewModel.Messages[0]);
+        viewModel.SelectedMessage = viewModel.Messages[0];
+        viewModel.CopySelectedMessageCommand.Execute(null);
 
         Assert.Equal(fullMessage, clipboardService.Text);
         Assert.Equal(

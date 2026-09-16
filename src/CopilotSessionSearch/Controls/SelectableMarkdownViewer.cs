@@ -2,7 +2,9 @@
 
 using System.Collections;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using MdXaml;
 
@@ -39,6 +41,58 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         get => (string)GetValue(HighlightTextProperty);
         set => SetValue(HighlightTextProperty, value);
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            ListViewItem? item = FindVisualAncestor<ListViewItem>(this);
+            if (item is not null)
+            {
+                item.Focus();
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (Keyboard.Modifiers == ModifierKeys.None
+            && IsListNavigationKey(e.Key))
+        {
+            ListView? listView = FindVisualAncestor<ListView>(this);
+            ListViewItem? item = FindVisualAncestor<ListViewItem>(this);
+            if (listView is not null && item is not null)
+            {
+                item.Focus();
+                RaiseKeyOnList(listView, e);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        base.OnPreviewKeyDown(e);
+    }
+
+    protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
+    {
+        ScrollViewer? parentScrollViewer = FindVisualAncestor<ScrollViewer>(this);
+        if (parentScrollViewer is not null)
+        {
+            e.Handled = true;
+            var forwardedEvent = new MouseWheelEventArgs(
+                e.MouseDevice,
+                e.Timestamp,
+                e.Delta)
+            {
+                RoutedEvent = MouseWheelEvent,
+                Source = parentScrollViewer,
+            };
+
+            parentScrollViewer.RaiseEvent(forwardedEvent);
+            return;
+        }
+
+        base.OnPreviewMouseWheel(e);
     }
 
     private static void OnMarkdownPropertyChanged(
@@ -133,4 +187,53 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
             }
         }
     }
+
+    private static bool IsListNavigationKey(Key key)
+    {
+        return key is Key.Up
+            or Key.Down
+            or Key.PageUp
+            or Key.PageDown
+            or Key.Home
+            or Key.End;
+    }
+
+    private static void RaiseKeyOnList(ListView listView, KeyEventArgs originalEvent)
+    {
+        PresentationSource? presentationSource = PresentationSource.FromVisual(listView);
+        if (presentationSource is null)
+        {
+            return;
+        }
+
+        var forwardedEvent = new KeyEventArgs(
+            originalEvent.KeyboardDevice,
+            presentationSource,
+            originalEvent.Timestamp,
+            originalEvent.Key)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent,
+            Source = listView,
+        };
+
+        listView.RaiseEvent(forwardedEvent);
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject child)
+        where T : DependencyObject
+    {
+        DependencyObject? current = VisualTreeHelper.GetParent(child);
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
 }

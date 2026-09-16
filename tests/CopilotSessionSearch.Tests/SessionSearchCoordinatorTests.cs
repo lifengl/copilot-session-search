@@ -75,9 +75,9 @@ public sealed class SessionSearchCoordinatorTests
             new SessionDocumentCache(),
             new SessionSearchService(),
             maximumConcurrency: 4);
-        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        using var cancellationSource = new CancellationTokenSource();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+        Task searchTask = Task.Run(
             async () =>
             {
                 await foreach (SessionSearchUpdate _ in coordinator.SearchAsync(
@@ -87,6 +87,10 @@ public sealed class SessionSearchCoordinatorTests
                 }
             });
 
+        await historySource.FirstLoadStarted;
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => searchTask);
         Assert.True(historySource.CancelledLoadCount > 0);
     }
 
@@ -107,6 +111,8 @@ public sealed class SessionSearchCoordinatorTests
         private readonly IReadOnlyList<SessionDescriptor> _sessions;
         private readonly TimeSpan _delay;
         private readonly string? _failedSessionId;
+        private readonly TaskCompletionSource _firstLoadStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _activeLoadCount;
         private int _maximumObservedConcurrency;
         private int _cancelledLoadCount;
@@ -125,6 +131,8 @@ public sealed class SessionSearchCoordinatorTests
 
         public int CancelledLoadCount => Volatile.Read(ref _cancelledLoadCount);
 
+        public Task FirstLoadStarted => _firstLoadStarted.Task;
+
         public Task<IReadOnlyList<SessionDescriptor>> GetSessionsAsync(
             CancellationToken cancellationToken)
         {
@@ -138,6 +146,7 @@ public sealed class SessionSearchCoordinatorTests
         {
             int activeLoads = Interlocked.Increment(ref _activeLoadCount);
             SetMaximumConcurrency(activeLoads);
+            _firstLoadStarted.TrySetResult();
 
             try
             {

@@ -46,6 +46,7 @@ public sealed class MainWindowViewModelTests
         await searchTask;
 
         Assert.False(viewModel.IsSearching);
+        Assert.NotNull(viewModel.SelectedResult);
         Assert.Equal(
             [newest.SessionId, middle.SessionId, oldest.SessionId],
             viewModel.Results.Select(result => result.Result.Session.SessionId));

@@ -56,4 +56,7 @@ public sealed class SessionDetailMessageViewModel
         OccurrenceCount,
         "match",
         "matches");
+
+    public string AccessibleName =>
+        $"{SpeakerText}, {MessageText}, {OccurrenceText}, {TimestampText}";
 }

@@ -15,10 +15,6 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
 
         <TextBlock FontWeight="SemiBold">
           <Run Text="{Binding SpeakerText, Mode=OneTime}" />
@@ -30,14 +26,7 @@
           <Run Text="{Binding OccurrenceText, Mode=OneTime}" />
         </TextBlock>
 
-        <Button Grid.Column="1"
-                Command="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType={x:Type ListView}}}"
-                CommandParameter="{Binding}"
-                Content="Copy full message"
-                Margin="12,0,0,0" />
-
         <Border Grid.Row="1"
-                Grid.ColumnSpan="2"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
                 BorderThickness="1"
                 Margin="0,8,0,0"
@@ -46,6 +35,7 @@
                                              HighlightText="{Binding Query, Mode=OneTime}"
                                              HorizontalScrollBarVisibility="Auto"
                                              IsSelectionEnabled="True"
+                                             IsTabStop="False"
                                              IsToolBarVisible="False"
                                              MaxHeight="620"
                                              MinHeight="72"
@@ -56,6 +46,7 @@
     </DataTemplate>
 
     <Style x:Key="DetailItemStyle" TargetType="{x:Type ListViewItem}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName, Mode=OneTime}" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Padding" Value="8" />
@@ -171,19 +162,27 @@
         <TextBlock Grid.Row="8"
                    Grid.ColumnSpan="2"
                    Margin="0,8,0,0"
-                   Text="Select rendered text and press Ctrl+C, use its context menu, or copy the full message."
+                   Text="Use arrow or paging keys to navigate messages. Press Enter to focus rendered text, then Escape to return to the list. The mouse wheel moves between messages; use a message's scrollbar for long content."
                    TextWrapping="Wrap" />
       </Grid>
     </Border>
 
-    <ListView Grid.Row="1"
+    <ListView x:Name="MessagesListView"
+              Grid.Row="1"
               AutomationProperties.Name="Matching conversation messages"
               ItemContainerStyle="{StaticResource DetailItemStyle}"
               ItemTemplate="{StaticResource DetailMessageTemplate}"
               ItemsSource="{Binding Messages}"
+              KeyboardNavigation.TabNavigation="Once"
               Margin="0,12,0,0"
+              PreviewKeyDown="MessagesListView_PreviewKeyDown"
+              PreviewMouseLeftButtonDown="MessagesListView_PreviewMouseLeftButtonDown"
               ScrollViewer.CanContentScroll="True"
               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+              ScrollViewer.VerticalScrollBarVisibility="Auto"
+              SelectedItem="{Binding SelectedMessage}"
+              SelectionMode="Single"
+              TabIndex="0"
               VirtualizingPanel.IsVirtualizing="True"
               VirtualizingPanel.VirtualizationMode="Recycling" />
 
@@ -221,13 +220,23 @@
                 HorizontalAlignment="Right"
                 Margin="0,12,0,0"
                 Orientation="Horizontal">
+      <Button Command="{Binding CopySelectedMessageCommand}"
+              Content="_Copy selected message"
+              MinWidth="160"
+              TabIndex="1"
+              ToolTip="Copy the selected full message (Ctrl+C or Alt+C)" />
       <Button Command="{Binding ResumeCommand}"
-              Content="Resume in console"
-              MinWidth="132" />
-      <Button Click="CloseButton_Click"
-              Content="Close"
+              Content="_Resume in console"
               Margin="8,0,0,0"
-              MinWidth="88" />
+              MinWidth="132"
+              TabIndex="2"
+              ToolTip="Resume this session (Alt+R)" />
+      <Button Click="CloseButton_Click"
+              Content="Cl_ose"
+              Margin="8,0,0,0"
+              MinWidth="88"
+              TabIndex="3"
+              ToolTip="Close this window (Alt+O)" />
     </StackPanel>
   </Grid>
 </Window>

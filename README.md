@@ -45,6 +45,18 @@ Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` c
 
 Markdown image syntax is converted into an ordinary link before rendering, and raw HTML image elements are escaped. This prevents the viewer from automatically fetching remote or local image content.
 
+## Keyboard and mouse
+
+- `Ctrl+F` focuses and selects the search text.
+- `Enter` in the search box starts a search.
+- `Alt+S` starts a search, `Alt+C` cancels an active search, and `Escape` also cancels.
+- In either result list, `Up`, `Down`, `Page Up`, `Page Down`, `Home`, and `End` change selection and bring the selected item into view.
+- `Enter` on a session opens its detail window.
+- `Enter` on a detail message focuses its rendered Markdown; `Escape` returns focus to the message list.
+- `Ctrl+C` on a selected detail message copies the full original Markdown. When rendered text has focus, `Ctrl+C` copies the selected text instead.
+- In the detail window, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
+- The mouse wheel over rendered Markdown scrolls the message list. Long messages keep their own scrollbar for direct scrolling.
+
 ## Copilot SDK usage
 
 Stable SDK APIs provide session listing and metadata. Persisted history is read through `CopilotClient.Rpc.Sessions.ReadPersistedEventsAsync`, which is public and strongly typed but currently marked experimental by the SDK. Its `GHCP001` warning suppression is intentionally limited to `CopilotSdkSessionHistorySource`.

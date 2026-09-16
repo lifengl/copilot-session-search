@@ -1,5 +1,8 @@
 ﻿using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using CopilotSessionSearch.Models;
 using CopilotSessionSearch.Services;
 using CopilotSessionSearch.ViewModels;
@@ -15,6 +18,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, SessionDetailsWindow> _detailWindows =
         new(StringComparer.Ordinal);
     private bool _allowClose;
+    private bool _shutdownStarted;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -40,6 +44,58 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         SearchTextBox.Focus();
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.F
+            || Keyboard.Modifiers != ModifierKeys.Control)
+        {
+            return;
+        }
+
+        SearchTextBox.Focus();
+        SearchTextBox.SelectAll();
+        e.Handled = true;
+    }
+
+    private async void SearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter
+            || Keyboard.Modifiers != ModifierKeys.None
+            || !_viewModel.SearchCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await _viewModel.SearchCommand.ExecuteAsync(null);
+    }
+
+    private void SearchResultItem_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        var item = (ListViewItem)sender;
+        var result = (SessionSearchResultViewModel)item.DataContext;
+
+        SearchResultsListView.SelectedItem = result;
+        item.Focus();
+        _viewModel.OpenDetailsCommand.Execute(result);
+        e.Handled = true;
+    }
+
+    private void SearchResultsListView_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter
+            || Keyboard.Modifiers != ModifierKeys.None
+            || _viewModel.SelectedResult is null)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _viewModel.OpenDetailsCommand.Execute(_viewModel.SelectedResult);
     }
 
     private void ShowDetails(SessionSearchResult result)
@@ -73,6 +129,13 @@ public partial class MainWindow : Window
         }
 
         e.Cancel = true;
+
+        if (_shutdownStarted)
+        {
+            return;
+        }
+
+        _shutdownStarted = true;
         IsEnabled = false;
 
         try
@@ -91,8 +154,9 @@ public partial class MainWindow : Window
         finally
         {
             _allowClose = true;
-            Close();
-            Application.Current.Shutdown();
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Normal,
+                new Action(Application.Current.Shutdown));
         }
     }
 }

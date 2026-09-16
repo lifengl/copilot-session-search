@@ -21,6 +21,10 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     [ObservableProperty]
     private string? _statusMessage;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CopySelectedMessageCommand))]
+    private SessionDetailMessageViewModel? _selectedMessage;
+
     public SessionDetailsViewModel(
         SessionSearchResult result,
         IConsoleLauncher consoleLauncher,
@@ -41,6 +45,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
                     result.Query))
             .OrderBy(message => message.MessageNumber)
             .ToArray();
+        SelectedMessage = Messages.FirstOrDefault();
     }
 
     public SessionSearchResult Result { get; }
@@ -111,17 +116,17 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void CopyMessage(SessionDetailMessageViewModel? message)
+    private bool CanCopySelectedMessage()
     {
-        if (message is null)
-        {
-            return;
-        }
+        return SelectedMessage is not null;
+    }
 
+    [RelayCommand(CanExecute = nameof(CanCopySelectedMessage))]
+    private void CopySelectedMessage()
+    {
         try
         {
-            _clipboardService.SetText(message.MarkdownText);
+            _clipboardService.SetText(SelectedMessage!.MarkdownText);
             ErrorMessage = null;
             StatusMessage = "The full message was copied to the clipboard.";
         }

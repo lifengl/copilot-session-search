@@ -32,6 +32,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     private string? _errorMessage;
 
+    [ObservableProperty]
+    private SessionSearchResultViewModel? _selectedResult;
+
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
         ISessionHistorySource historySource)
@@ -112,6 +115,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         IsSearching = true;
         ErrorMessage = null;
         Results.Clear();
+        SelectedResult = null;
         _latestProgress = new SessionSearchProgress(0, 0, 0, 0);
         StatusText = "Loading the session list...";
 
@@ -168,6 +172,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     private void InsertResult(SessionSearchResultViewModel result)
     {
+        bool selectResult = SelectedResult is null;
         int insertionIndex = 0;
         while (insertionIndex < Results.Count
             && Results[insertionIndex].ModifiedTime >= result.ModifiedTime)
@@ -176,6 +181,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         }
 
         Results.Insert(insertionIndex, result);
+
+        if (selectResult)
+        {
+            SelectedResult = result;
+        }
     }
 
     private static string FormatProgress(SessionSearchProgress progress)

@@ -5,6 +5,7 @@
         Height="720"
         MinHeight="480"
         MinWidth="720"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
         Title="Copilot Session Search"
         Width="1040"
         WindowStartupLocation="CenterScreen">
@@ -31,11 +32,7 @@
     </DataTemplate>
 
     <DataTemplate x:Key="SearchResultTemplate">
-      <Button AutomationProperties.Name="{Binding Name, Mode=OneTime}"
-              Command="{Binding DataContext.OpenDetailsCommand, RelativeSource={RelativeSource AncestorType={x:Type ListView}}}"
-              CommandParameter="{Binding}"
-              HorizontalContentAlignment="Stretch"
-              Padding="12">
+      <Border Padding="12">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -71,13 +68,15 @@
                         ItemTemplate="{StaticResource SampleTemplate}"
                         ItemsSource="{Binding Samples, Mode=OneTime}" />
         </Grid>
-      </Button>
+      </Border>
     </DataTemplate>
 
     <Style x:Key="SearchResultItemStyle" TargetType="{x:Type ListViewItem}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Name, Mode=OneTime}" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Padding" Value="0" />
+      <EventSetter Event="PreviewMouseLeftButtonUp" Handler="SearchResultItem_PreviewMouseLeftButtonUp" />
     </Style>
   </Window.Resources>
 
@@ -104,18 +103,25 @@
                AutomationProperties.Name="Search conversation history"
                MinHeight="30"
                Padding="8,4"
-               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+              PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+              TabIndex="0"
+              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+              ToolTip="Search conversation history (Ctrl+F)" />
       <Button Grid.Column="1"
               Command="{Binding SearchCommand}"
-              Content="Search"
+              Content="_Search"
               IsDefault="True"
               Margin="8,0,0,0"
-              MinWidth="88" />
+              MinWidth="88"
+              TabIndex="1"
+              ToolTip="Search (Enter or Alt+S)" />
       <Button Grid.Column="2"
               Command="{Binding CancelCommand}"
-              Content="Cancel"
+              Content="_Cancel"
               Margin="8,0,0,0"
-              MinWidth="88" />
+              MinWidth="88"
+              TabIndex="2"
+              ToolTip="Cancel search (Escape or Alt+C)" />
     </Grid>
 
     <TextBlock Grid.Row="1"
@@ -140,14 +146,21 @@
       </TextBlock.Style>
     </TextBlock>
 
-    <ListView Grid.Row="3"
+    <ListView x:Name="SearchResultsListView"
+              Grid.Row="3"
               AutomationProperties.Name="Matching Copilot sessions"
               ItemContainerStyle="{StaticResource SearchResultItemStyle}"
               ItemTemplate="{StaticResource SearchResultTemplate}"
               ItemsSource="{Binding Results}"
+              KeyboardNavigation.TabNavigation="Once"
               Margin="0,12,0,0"
+              PreviewKeyDown="SearchResultsListView_PreviewKeyDown"
               ScrollViewer.CanContentScroll="True"
               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+              ScrollViewer.VerticalScrollBarVisibility="Auto"
+              SelectedItem="{Binding SelectedResult}"
+              SelectionMode="Single"
+              TabIndex="3"
               VirtualizingPanel.IsVirtualizing="True"
               VirtualizingPanel.VirtualizationMode="Recycling" />
   </Grid>
