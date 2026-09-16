@@ -55,157 +55,187 @@
       <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Padding" Value="8" />
     </Style>
+
+    <Style x:Key="MetadataValueStyle" TargetType="{x:Type TextBox}">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CaretBrush" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+      <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="IsReadOnlyCaretVisible" Value="True" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
   </Window.Resources>
 
-  <Grid Margin="16">
+  <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
-            BorderThickness="1"
-            Padding="12">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <Grid Margin="16,16,16,8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
 
-        <TextBlock Grid.ColumnSpan="2"
+      <Border BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+              BorderThickness="1"
+              Padding="12">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <TextBox Grid.ColumnSpan="2"
+                   AutomationProperties.Name="Session name"
                    FontSize="18"
                    FontWeight="SemiBold"
-                   Text="{Binding Name, Mode=OneTime}"
-                   TextWrapping="Wrap" />
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding Name, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="1"
-                   FontWeight="SemiBold"
-                   Margin="0,8,12,0"
-                   Text="Session ID:" />
-        <TextBlock Grid.Row="1"
+          <TextBlock x:Name="SessionIdLabel"
+                     Grid.Row="1"
+                     FontWeight="SemiBold"
+                     Margin="0,8,12,0"
+                     Text="Session ID:" />
+          <TextBox Grid.Row="1"
                    Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=SessionIdLabel}"
                    Margin="0,8,0,0"
-                   Text="{Binding SessionId, Mode=OneTime}"
-                   TextWrapping="Wrap" />
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding SessionId, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="2"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Working directory:" />
-        <TextBlock Grid.Row="2"
+          <TextBlock x:Name="WorkingDirectoryLabel"
+                     Grid.Row="2"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Working directory:" />
+          <TextBox Grid.Row="2"
                    Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=WorkingDirectoryLabel}"
                    Margin="0,4,0,0"
-                   Text="{Binding WorkingDirectory, Mode=OneTime}"
-                   TextWrapping="Wrap" />
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding WorkingDirectory, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="3"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Repository:" />
-        <TextBlock Grid.Row="3"
+          <TextBlock x:Name="RepositoryLabel"
+                     Grid.Row="3"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Repository:" />
+          <TextBox Grid.Row="3"
                    Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=RepositoryLabel}"
                    Margin="0,4,0,0"
-                   Text="{Binding RepositoryAndBranch, Mode=OneTime}"
-                   TextWrapping="Wrap" />
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding RepositoryAndBranch, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="4"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Started:" />
-        <TextBlock Grid.Row="4"
+          <TextBlock x:Name="StartedLabel"
+                     Grid.Row="4"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Started:" />
+          <TextBox Grid.Row="4"
                    Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=StartedLabel}"
                    Margin="0,4,0,0"
+                   Style="{StaticResource MetadataValueStyle}"
                    Text="{Binding StartTimeText, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="5"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Last active:" />
-        <TextBlock Grid.Row="5"
+          <TextBlock x:Name="LastActiveLabel"
+                     Grid.Row="5"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Last active:" />
+          <TextBox Grid.Row="5"
                    Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=LastActiveLabel}"
                    Margin="0,4,0,0"
+                   Style="{StaticResource MetadataValueStyle}"
                    Text="{Binding LastActiveText, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="6"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Session span:" />
-        <TextBlock Grid.Row="6"
+          <TextBlock x:Name="SessionSpanLabel"
+                     Grid.Row="6"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Session span:" />
+          <TextBox Grid.Row="6"
                    Grid.Column="1"
-                   Margin="0,4,0,0">
-          <Run Text="{Binding SessionSpanText, Mode=OneTime}" />
-          <Run Text=" - " />
-          <Run Text="{Binding MessageCountText, Mode=OneTime}" />
-        </TextBlock>
+                   AutomationProperties.LabeledBy="{Binding ElementName=SessionSpanLabel}"
+                   Margin="0,4,0,0"
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding SessionSpanSummaryText, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="7"
-                   FontWeight="SemiBold"
-                   Margin="0,4,12,0"
-                   Text="Search:" />
-        <TextBlock Grid.Row="7"
+          <TextBlock x:Name="SearchLabel"
+                     Grid.Row="7"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Search:" />
+          <TextBox Grid.Row="7"
                    Grid.Column="1"
-                   Margin="0,4,0,0">
-          <Run Text="{Binding Query, Mode=OneTime}" />
-          <Run Text=" - " />
-          <Run Text="{Binding MatchCountText, Mode=OneTime}" />
-        </TextBlock>
+                   AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}"
+                   Margin="0,4,0,0"
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding SearchSummaryText, Mode=OneTime}" />
 
-        <TextBlock Grid.Row="8"
-                   Grid.ColumnSpan="2"
-                   Margin="0,8,0,0"
-                   Text="Use arrow or paging keys to navigate messages. Press Enter to focus rendered text. Escape closes this window. The mouse wheel moves between messages; use a message's scrollbar for long content."
-                   TextWrapping="Wrap" />
-      </Grid>
-    </Border>
+          <TextBlock x:Name="ResumeCommandLabel"
+                     Grid.Row="8"
+                     FontWeight="SemiBold"
+                     Margin="0,4,12,0"
+                     Text="Resume command:" />
+          <TextBox Grid.Row="8"
+                   Grid.Column="1"
+                   AutomationProperties.LabeledBy="{Binding ElementName=ResumeCommandLabel}"
+                   FontFamily="Consolas"
+                   Margin="0,4,0,0"
+                   Style="{StaticResource MetadataValueStyle}"
+                   Text="{Binding ResumeCommandText, Mode=OneTime}" />
+        </Grid>
+      </Border>
 
-    <ListView x:Name="MessagesListView"
-              Grid.Row="1"
-              AutomationProperties.Name="Matching conversation messages"
-              ItemContainerStyle="{StaticResource DetailItemStyle}"
-              ItemTemplate="{StaticResource DetailMessageTemplate}"
-              ItemsSource="{Binding Messages}"
-              KeyboardNavigation.TabNavigation="Once"
-              Margin="0,12,0,0"
-              PreviewKeyDown="MessagesListView_PreviewKeyDown"
-              PreviewMouseLeftButtonDown="MessagesListView_PreviewMouseLeftButtonDown"
-              ScrollViewer.CanContentScroll="True"
-              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-              ScrollViewer.VerticalScrollBarVisibility="Auto"
-              SelectedItem="{Binding SelectedMessage}"
-              SelectionMode="Single"
-              TabIndex="0"
-              VirtualizingPanel.IsVirtualizing="True"
-              VirtualizingPanel.VirtualizationMode="Recycling" />
+      <ListView x:Name="MessagesListView"
+                Grid.Row="1"
+                AutomationProperties.Name="Matching conversation messages"
+                ItemContainerStyle="{StaticResource DetailItemStyle}"
+                ItemTemplate="{StaticResource DetailMessageTemplate}"
+                ItemsSource="{Binding Messages}"
+                KeyboardNavigation.TabNavigation="Once"
+                Margin="0,12,0,0"
+                PreviewKeyDown="MessagesListView_PreviewKeyDown"
+                PreviewMouseLeftButtonDown="MessagesListView_PreviewMouseLeftButtonDown"
+                ScrollViewer.CanContentScroll="True"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                ScrollViewer.VerticalScrollBarVisibility="Visible"
+                SelectedItem="{Binding SelectedMessage}"
+                SelectionMode="Single"
+                TabIndex="0"
+                VirtualizingPanel.IsVirtualizing="True"
+                VirtualizingPanel.ScrollUnit="Pixel"
+                VirtualizingPanel.VirtualizationMode="Recycling" />
 
-    <StackPanel Grid.Row="2" Margin="0,8,0,0">
-      <TextBlock AutomationProperties.LiveSetting="Polite"
-                 Text="{Binding StatusMessage}">
-        <TextBlock.Style>
-          <Style TargetType="{x:Type TextBlock}">
-            <Setter Property="Visibility" Value="Visible" />
-            <Style.Triggers>
-              <DataTrigger Binding="{Binding StatusMessage}" Value="{x:Null}">
-                <Setter Property="Visibility" Value="Collapsed" />
-              </DataTrigger>
-            </Style.Triggers>
-          </Style>
-        </TextBlock.Style>
-      </TextBlock>
-      <TextBlock AutomationProperties.LiveSetting="Assertive"
+      <TextBlock Grid.Row="2"
+                 AutomationProperties.LiveSetting="Assertive"
                  FontWeight="SemiBold"
+                 Margin="0,8,0,0"
                  Text="{Binding ErrorMessage}">
         <TextBlock.Style>
           <Style TargetType="{x:Type TextBlock}">
@@ -218,29 +248,50 @@
           </Style>
         </TextBlock.Style>
       </TextBlock>
-    </StackPanel>
 
-    <StackPanel Grid.Row="3"
-                HorizontalAlignment="Right"
-                Margin="0,12,0,0"
-                Orientation="Horizontal">
-      <Button Command="{Binding CopySelectedMessageCommand}"
-              Content="_Copy selected message"
-              MinWidth="160"
-              TabIndex="1"
-              ToolTip="Copy the selected full message (Ctrl+C or Alt+C)" />
-      <Button Command="{Binding ResumeCommand}"
-              Content="_Resume in console"
-              Margin="8,0,0,0"
-              MinWidth="132"
-              TabIndex="2"
-              ToolTip="Resume this session (Alt+R)" />
-      <Button Click="CloseButton_Click"
-              Content="Cl_ose"
-              Margin="8,0,0,0"
-              MinWidth="88"
-              TabIndex="3"
-              ToolTip="Close this window (Alt+O)" />
-    </StackPanel>
+      <StackPanel Grid.Row="3"
+                  HorizontalAlignment="Right"
+                  Margin="0,12,0,0"
+                  Orientation="Horizontal">
+        <Button Command="{Binding CopySessionInfoCommand}"
+                Content="Copy session _info"
+                MinWidth="132"
+                TabIndex="1"
+                ToolTip="Copy session metadata and resume command (Alt+I)" />
+        <Button Command="{Binding CopySelectedMessageCommand}"
+                Content="_Copy selected message"
+                Margin="8,0,0,0"
+                MinWidth="160"
+                TabIndex="2"
+                ToolTip="Copy the selected full message (Ctrl+C or Alt+C)" />
+        <Button Command="{Binding ResumeCommand}"
+                Content="_Resume in console"
+                Margin="8,0,0,0"
+                MinWidth="132"
+                TabIndex="3"
+                ToolTip="Resume this session (Alt+R)" />
+        <Button Click="CloseButton_Click"
+                Content="Cl_ose"
+                Margin="8,0,0,0"
+                MinWidth="88"
+                TabIndex="4"
+                ToolTip="Close this window (Alt+O)" />
+      </StackPanel>
+    </Grid>
+
+    <StatusBar Grid.Row="1"
+               Height="24"
+               Padding="0">
+      <StatusBarItem HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Stretch"
+                     Padding="8,0"
+                     VerticalContentAlignment="Center">
+        <TextBlock AutomationProperties.LiveSetting="Polite"
+                   FontSize="12"
+                   Text="{Binding StatusBarText}"
+                   TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center" />
+      </StatusBarItem>
+    </StatusBar>
   </Grid>
 </Window>

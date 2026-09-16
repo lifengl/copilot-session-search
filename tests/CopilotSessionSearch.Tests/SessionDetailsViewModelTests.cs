@@ -54,6 +54,23 @@ public sealed class SessionDetailsViewModelTests
         Assert.Equal(2, viewModel.Messages.Count);
         Assert.Same(viewModel.Messages[0], viewModel.SelectedMessage);
         Assert.Equal(3, viewModel.Messages[0].OccurrenceCount);
+        Assert.Equal("copilot --resume=session-id", viewModel.ResumeCommandText);
+        Assert.Contains("Esc close", viewModel.StatusBarText, StringComparison.Ordinal);
+
+        viewModel.CopySessionInfoCommand.Execute(null);
+
+        Assert.Contains("Session ID: session-id", clipboardService.Text, StringComparison.Ordinal);
+        Assert.Contains(
+            @"Working directory: Q:\ws\project",
+            clipboardService.Text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Resume command: copilot --resume=session-id",
+            clipboardService.Text,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            "Session information was copied to the clipboard.",
+            viewModel.StatusBarText);
 
         viewModel.SelectedMessage = viewModel.Messages[0];
         viewModel.CopySelectedMessageCommand.Execute(null);

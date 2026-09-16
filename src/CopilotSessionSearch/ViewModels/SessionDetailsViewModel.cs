@@ -19,6 +19,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     private string? _errorMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusBarText))]
     private string? _statusMessage;
 
     [ObservableProperty]
@@ -94,6 +95,15 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         "match",
         "matches");
 
+    public string SessionSpanSummaryText => $"{SessionSpanText} - {MessageCountText}";
+
+    public string SearchSummaryText => $"{Query} - {MatchCountText}";
+
+    public string ResumeCommandText => $"copilot --resume={SessionId}";
+
+    public string StatusBarText => StatusMessage
+        ?? "Up/Down navigate | Page Up/Down scroll | Enter focus text | Esc close | Ctrl+C copy";
+
     public IReadOnlyList<SessionDetailMessageViewModel> Messages { get; }
 
     [RelayCommand]
@@ -135,5 +145,36 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
             ErrorMessage = $"Unable to copy the message: {ex.Message}";
             StatusMessage = null;
         }
+    }
+
+    [RelayCommand]
+    private void CopySessionInfo()
+    {
+        try
+        {
+            _clipboardService.SetText(CreateSessionInfoText());
+            ErrorMessage = null;
+            StatusMessage = "Session information was copied to the clipboard.";
+        }
+        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
+        {
+            ErrorMessage = $"Unable to copy session information: {ex.Message}";
+            StatusMessage = null;
+        }
+    }
+
+    private string CreateSessionInfoText()
+    {
+        return string.Join(
+            Environment.NewLine,
+            $"Name: {Name}",
+            $"Session ID: {SessionId}",
+            $"Working directory: {WorkingDirectory}",
+            $"Repository: {RepositoryAndBranch}",
+            $"Started: {StartTimeText}",
+            $"Last active: {LastActiveText}",
+            $"Session span: {SessionSpanSummaryText}",
+            $"Search: {SearchSummaryText}",
+            $"Resume command: {ResumeCommandText}");
     }
 }

@@ -11,6 +11,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Shows up to three excerpts for each session in the main window.
 - Opens modeless detail windows containing every matching message rendered as Markdown.
 - Supports selecting and copying rendered text, plus a one-click copy of each full message.
+- Makes session metadata and the shell-ready resume command directly selectable.
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
 - Supports System, Light, and Dark Fluent themes.
@@ -48,6 +49,8 @@ Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` c
 
 Markdown image syntax is converted into an ordinary link before rendering, and raw HTML image elements are escaped. This prevents the viewer from automatically fetching remote or local image content.
 
+Session name, ID, working directory, repository, dates, span, search query, and `copilot --resume=<session-id>` command are selectable read-only fields. **Copy session info** places all of those values into the clipboard as a shell-friendly text block.
+
 ## Keyboard and mouse
 
 - `Ctrl+F` focuses and selects the search text.
@@ -58,8 +61,9 @@ Markdown image syntax is converted into an ordinary link before rendering, and r
 - `Enter` on a detail message focuses its rendered Markdown.
 - `Escape` closes the detail window from the message list, rendered Markdown, or footer buttons.
 - `Ctrl+C` on a selected detail message copies the full original Markdown. When rendered text has focus, `Ctrl+C` copies the selected text instead.
-- In the detail window, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
+- In the detail window, `Alt+I` copies session information, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
 - The mouse wheel over rendered Markdown scrolls the message list. Long messages keep their own scrollbar for direct scrolling.
+- The detail message list keeps its outer scrollbar visible and uses pixel scrolling for partially visible messages.
 
 ## Theme
 
@@ -79,6 +83,8 @@ The bottom status bar keeps secondary information out of the primary search row.
 - A determinate progress indicator while searching.
 - The total number of matched sessions.
 - A compact icon-only theme button. Its menu shows monitor **System**, sun **Light**, and crescent **Dark** choices with text and checkmarks.
+
+The detail window has its own narrow status bar for keyboard guidance and transient copy confirmations, keeping instructions out of the session metadata.
 
 ## Application icon
 
