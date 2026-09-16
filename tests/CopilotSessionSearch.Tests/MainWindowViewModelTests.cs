@@ -27,10 +27,19 @@ public sealed class MainWindowViewModelTests
             new SessionDocumentCache(),
             new SessionSearchService(),
             maximumConcurrency: 2);
-        var viewModel = new MainWindowViewModel(coordinator, historySource)
+        var themeService = new RecordingThemeService();
+        var viewModel = new MainWindowViewModel(
+            coordinator,
+            historySource,
+            themeService)
         {
             SearchText = "needle",
         };
+
+        Assert.Equal(AppThemePreference.System, viewModel.SelectedThemeOption.Preference);
+        viewModel.SelectedThemeOption = viewModel.ThemeOptions.Single(
+            option => option.Preference == AppThemePreference.Dark);
+        Assert.Equal(AppThemePreference.Dark, themeService.CurrentPreference);
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
@@ -122,6 +131,17 @@ public sealed class MainWindowViewModelTests
         public ValueTask DisposeAsync()
         {
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingThemeService : IThemeService
+    {
+        public AppThemePreference CurrentPreference { get; private set; } =
+            AppThemePreference.System;
+
+        public void Apply(AppThemePreference preference)
+        {
+            CurrentPreference = preference;
         }
     }
 }

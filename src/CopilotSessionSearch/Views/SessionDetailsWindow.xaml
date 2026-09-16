@@ -32,6 +32,8 @@
                 Margin="0,8,0,0"
                 Padding="8">
           <controls:SelectableMarkdownViewer AutomationProperties.Name="Rendered conversation message"
+                                             Background="Transparent"
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}"
                                              HighlightText="{Binding Query, Mode=OneTime}"
                                              HorizontalScrollBarVisibility="Auto"
                                              IsSelectionEnabled="True"

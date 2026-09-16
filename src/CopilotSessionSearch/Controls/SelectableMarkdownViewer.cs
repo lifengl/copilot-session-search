@@ -3,6 +3,7 @@
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -12,6 +13,10 @@ namespace CopilotSessionSearch.Controls;
 
 public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 {
+    private const string CodeSpanTag = "CodeSpan";
+
+    private bool _isApplyingDocumentTheme;
+
     public static readonly DependencyProperty SourceMarkdownProperty = DependencyProperty.Register(
         nameof(SourceMarkdown),
         typeof(string),
@@ -41,6 +46,19 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         get => (string)GetValue(HighlightTextProperty);
         set => SetValue(HighlightTextProperty, value);
+    }
+
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+
+        if (!_isApplyingDocumentTheme
+            && (e.Property == ForegroundProperty || e.Property == BackgroundProperty)
+            && Document is FlowDocument document)
+        {
+            ApplyDocumentTheme(document);
+            ApplySearchHighlighting(document);
+        }
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -114,12 +132,152 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         }
 
         document.PagePadding = new Thickness(0);
+        document.Background = Brushes.Transparent;
+        BindingOperations.SetBinding(
+            document,
+            TextElement.FontFamilyProperty,
+            new Binding(nameof(FontFamily))
+            {
+                Mode = BindingMode.OneWay,
+                Source = this,
+            });
+        BindingOperations.SetBinding(
+            document,
+            TextElement.FontSizeProperty,
+            new Binding(nameof(FontSize))
+            {
+                Mode = BindingMode.OneWay,
+                Source = this,
+            });
+        BindingOperations.SetBinding(
+            document,
+            TextElement.ForegroundProperty,
+            new Binding(nameof(Foreground))
+            {
+                Mode = BindingMode.OneWay,
+                Source = this,
+            });
 
+        ApplyDocumentTheme(document);
+        ApplySearchHighlighting(document);
+    }
+
+    private void ApplyDocumentTheme(FlowDocument document)
+    {
+        if (_isApplyingDocumentTheme)
+        {
+            return;
+        }
+
+        _isApplyingDocumentTheme = true;
+        try
+        {
+            Brush foreground = Foreground ?? SystemColors.WindowTextBrush;
+            Brush subtleBackground = CreateTranslucentBrush(
+                foreground,
+                SystemParameters.HighContrast ? (byte)0 : (byte)24);
+            Brush borderBrush = CreateTranslucentBrush(
+                foreground,
+                SystemParameters.HighContrast ? (byte)255 : (byte)72);
+
+            var textElements = new List<TextElement>();
+            CollectElements(document, textElements);
+            foreach (TextElement textElement in textElements)
+            {
+                bool isCodeSpan = string.Equals(
+                    textElement.Tag as string,
+                    CodeSpanTag,
+                    StringComparison.Ordinal);
+
+                if (isCodeSpan)
+                {
+                    FontFamily fontFamily = textElement.FontFamily;
+                    double fontSize = textElement.FontSize;
+                    FontStretch fontStretch = textElement.FontStretch;
+                    FontStyle fontStyle = textElement.FontStyle;
+                    FontWeight fontWeight = textElement.FontWeight;
+
+                    textElement.Style = null;
+                    textElement.FontFamily = fontFamily;
+                    textElement.FontSize = fontSize;
+                    textElement.FontStretch = fontStretch;
+                    textElement.FontStyle = fontStyle;
+                    textElement.FontWeight = fontWeight;
+                }
+
+                BindingOperations.SetBinding(
+                    textElement,
+                    TextElement.ForegroundProperty,
+                    new Binding(nameof(Foreground))
+                    {
+                        Mode = BindingMode.OneWay,
+                        Source = this,
+                    });
+
+                object localBackground = textElement.ReadLocalValue(
+                    TextElement.BackgroundProperty);
+                if (isCodeSpan
+                    || (localBackground != DependencyProperty.UnsetValue
+                        && localBackground is not null))
+                {
+                    textElement.Background = subtleBackground;
+                }
+            }
+
+            var tables = new List<Table>();
+            CollectElements(document, tables);
+            foreach (Table table in tables)
+            {
+                table.Background = Brushes.Transparent;
+                table.BorderBrush = borderBrush;
+
+                foreach (TableRowGroup rowGroup in table.RowGroups)
+                {
+                    rowGroup.Background = Brushes.Transparent;
+
+                    for (int rowIndex = 0; rowIndex < rowGroup.Rows.Count; rowIndex++)
+                    {
+                        TableRow row = rowGroup.Rows[rowIndex];
+                        row.Background = Brushes.Transparent;
+
+                        foreach (TableCell cell in row.Cells)
+                        {
+                            cell.Background = rowIndex == 0
+                                ? subtleBackground
+                                : Brushes.Transparent;
+                            cell.BorderBrush = borderBrush;
+                        }
+                    }
+                }
+            }
+
+            var controls = new List<Control>();
+            CollectElements(document, controls);
+            foreach (Control control in controls)
+            {
+                if (control.GetType().Namespace?.StartsWith(
+                    "ICSharpCode.AvalonEdit",
+                    StringComparison.Ordinal) == true)
+                {
+                    control.Background = subtleBackground;
+                    control.BorderBrush = borderBrush;
+                    control.Foreground = foreground;
+                }
+            }
+        }
+        finally
+        {
+            _isApplyingDocumentTheme = false;
+        }
+    }
+
+    private void ApplySearchHighlighting(FlowDocument document)
+    {
         string highlightText = HighlightText ?? string.Empty;
         if (highlightText.Length > 0)
         {
             var runs = new List<Run>();
-            CollectRuns(document, runs);
+            CollectElements(document, runs);
 
             foreach (Run run in runs)
             {
@@ -128,20 +286,22 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         }
     }
 
-    private static void CollectRuns(
+    private static void CollectElements<T>(
         DependencyObject parent,
-        ICollection<Run> runs)
+        ICollection<T> elements)
+        where T : DependencyObject
     {
         IEnumerable children = LogicalTreeHelper.GetChildren(parent);
         foreach (object child in children)
         {
-            if (child is Run run)
+            if (child is T match)
             {
-                runs.Add(run);
+                elements.Add(match);
             }
-            else if (child is DependencyObject dependencyObject)
+
+            if (child is DependencyObject dependencyObject)
             {
-                CollectRuns(dependencyObject, runs);
+                CollectElements(dependencyObject, elements);
             }
         }
     }
@@ -186,6 +346,25 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
                 range.ApplyPropertyValue(TextElement.ForegroundProperty, SystemColors.HighlightTextBrush);
             }
         }
+    }
+
+    private static Brush CreateTranslucentBrush(Brush source, byte alpha)
+    {
+        if (alpha == 0)
+        {
+            return Brushes.Transparent;
+        }
+
+        if (source is not SolidColorBrush solidColorBrush)
+        {
+            return source;
+        }
+
+        Color color = solidColorBrush.Color;
+        color.A = alpha;
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 
     private static bool IsListNavigationKey(Key key)

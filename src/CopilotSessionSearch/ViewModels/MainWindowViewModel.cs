@@ -12,6 +12,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 {
     private readonly SessionSearchCoordinator _searchCoordinator;
     private readonly ISessionHistorySource _historySource;
+    private readonly IThemeService _themeService;
     private CancellationTokenSource? _searchCancellationSource;
     private Task _activeSearchTask = Task.CompletedTask;
     private SessionSearchProgress _latestProgress = new(0, 0, 0, 0);
@@ -35,20 +36,41 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     private SessionSearchResultViewModel? _selectedResult;
 
+    [ObservableProperty]
+    private ThemeOption _selectedThemeOption;
+
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
-        ISessionHistorySource historySource)
+        ISessionHistorySource historySource,
+        IThemeService themeService)
     {
         ArgumentNullException.ThrowIfNull(searchCoordinator);
         ArgumentNullException.ThrowIfNull(historySource);
+        ArgumentNullException.ThrowIfNull(themeService);
 
         _searchCoordinator = searchCoordinator;
         _historySource = historySource;
+        _themeService = themeService;
+        ThemeOptions =
+        [
+            new ThemeOption(AppThemePreference.System, "System"),
+            new ThemeOption(AppThemePreference.Light, "Light"),
+            new ThemeOption(AppThemePreference.Dark, "Dark"),
+        ];
+        _selectedThemeOption = ThemeOptions.Single(
+            option => option.Preference == themeService.CurrentPreference);
     }
 
     public event Action<SessionSearchResult>? OpenDetailsRequested;
 
     public ObservableCollection<SessionSearchResultViewModel> Results { get; } = [];
+
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; }
+
+    partial void OnSelectedThemeOptionChanged(ThemeOption value)
+    {
+        _themeService.Apply(value.Preference);
+    }
 
     private bool CanSearch()
     {

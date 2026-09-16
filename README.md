@@ -13,6 +13,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Supports selecting and copying rendered text, plus a one-click copy of each full message.
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
+- Supports System, Light, and Dark Fluent themes.
 
 ## Requirements
 
@@ -56,6 +57,16 @@ Markdown image syntax is converted into an ordinary link before rendering, and r
 - `Ctrl+C` on a selected detail message copies the full original Markdown. When rendered text has focus, `Ctrl+C` copies the selected text instead.
 - In the detail window, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
 - The mouse wheel over rendered Markdown scrolls the message list. Long messages keep their own scrollbar for direct scrolling.
+
+## Theme
+
+The theme selector defaults to **System** each time the application starts. System mode follows the current Windows app theme and updates automatically when Windows changes between light, dark, or high-contrast modes.
+
+Selecting **Light** or **Dark** applies that Fluent theme immediately to the main window, open detail windows, controls, scrollbars, selection visuals, and rendered Markdown text. Select **System** again to resume following Windows. `Alt+T` focuses the theme selector.
+
+Theme support uses the built-in .NET 10 WPF `Application.ThemeMode` API. This API is currently marked experimental by WPF, and its `WPF0001` warning suppression is isolated to `ThemeService`.
+
+MdXaml emits some fixed light-theme colors, so `SelectableMarkdownViewer` normalizes headings, tables, code backgrounds, links, and other text elements against the active WPF foreground. This avoids white table rows and black headings when the application is dark.
 
 ## Copilot SDK usage
 

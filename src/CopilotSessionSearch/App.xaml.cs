@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using CopilotSessionSearch.Models;
 using CopilotSessionSearch.Services;
 using CopilotSessionSearch.ViewModels;
 
@@ -12,12 +13,17 @@ public partial class App : Application
 
         try
         {
+            var themeService = new ThemeService();
+            themeService.Apply(AppThemePreference.System);
             var historySource = new CopilotSdkSessionHistorySource();
             var searchCoordinator = new SessionSearchCoordinator(
                 historySource,
                 new SessionDocumentCache(),
                 new SessionSearchService());
-            var viewModel = new MainWindowViewModel(searchCoordinator, historySource);
+            var viewModel = new MainWindowViewModel(
+                searchCoordinator,
+                historySource,
+                themeService);
             var window = new MainWindow(
                 viewModel,
                 new ConsoleLauncher(),
