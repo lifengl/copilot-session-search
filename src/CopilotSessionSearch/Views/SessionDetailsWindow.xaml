@@ -7,7 +7,7 @@
         MinHeight="520"
         MinWidth="760"
         PreviewKeyDown="SessionDetailsWindow_PreviewKeyDown"
-        Title="{Binding Name, StringFormat=Session details - {0}}"
+        Title="{Binding Name, StringFormat=Session - {0}}"
         Width="1080"
         WindowStartupLocation="CenterOwner">
   <Window.Resources>
