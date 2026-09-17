@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="GitHub.Copilot.SDK" Version="1.0.14" />
     <PackageReference Include="MdXaml" Version="1.27.0" />

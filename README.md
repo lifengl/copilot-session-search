@@ -78,6 +78,8 @@ The preference is stored atomically as readable JSON at `%LOCALAPPDATA%\CopilotS
 
 MdXaml emits some fixed light-theme colors, so `SelectableMarkdownViewer` normalizes headings, tables, code backgrounds, links, and other text elements against the active WPF foreground. This avoids white table rows and black headings when the application is dark.
 
+Fenced code blocks use AvalonEdit. Light mode retains its language syntax highlighting; Dark and High Contrast modes disable the fixed syntax palette and use selectable, theme-aware monospace text so every token remains readable.
+
 ## Status bar
 
 The bottom status bar keeps secondary information out of the primary search row. It contains:

@@ -1,12 +1,15 @@
 #nullable enable
 
 using System.Collections;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
 using MdXaml;
 
 namespace CopilotSessionSearch.Controls;
@@ -15,6 +18,7 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 {
     private const string CodeSpanTag = "CodeSpan";
 
+    private readonly ConditionalWeakTable<TextEditor, CodeBlockThemeState> _codeBlockThemes = new();
     private bool _isApplyingDocumentTheme;
 
     public static readonly DependencyProperty SourceMarkdownProperty = DependencyProperty.Register(
@@ -168,6 +172,8 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
             Brush borderBrush = CreateTranslucentBrush(
                 foreground,
                 SystemParameters.HighContrast ? (byte)255 : (byte)72);
+            bool usePlainCode =
+                SystemParameters.HighContrast || IsLightForeground(foreground);
 
             var textElements = new List<TextElement>();
             CollectElements(document, textElements);
@@ -240,18 +246,25 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
                 }
             }
 
-            var controls = new List<Control>();
-            CollectElements(document, controls);
-            foreach (Control control in controls)
+            var codeEditors = new List<TextEditor>();
+            CollectElements(document, codeEditors);
+            foreach (TextEditor codeEditor in codeEditors)
             {
-                if (control.GetType().Namespace?.StartsWith(
-                    "ICSharpCode.AvalonEdit",
-                    StringComparison.Ordinal) == true)
-                {
-                    control.Background = subtleBackground;
-                    control.BorderBrush = borderBrush;
-                    control.Foreground = foreground;
-                }
+                CodeBlockThemeState state = _codeBlockThemes.GetValue(
+                    codeEditor,
+                    static editor => new CodeBlockThemeState(editor.SyntaxHighlighting));
+
+                codeEditor.SyntaxHighlighting = usePlainCode
+                    ? null
+                    : state.SyntaxHighlighting;
+                codeEditor.Background = subtleBackground;
+                codeEditor.BorderBrush = borderBrush;
+                codeEditor.Foreground = foreground;
+                codeEditor.LineNumbersForeground = foreground;
+                codeEditor.TextArea.Background = Brushes.Transparent;
+                codeEditor.TextArea.Foreground = foreground;
+                codeEditor.TextArea.SelectionBrush = SystemColors.HighlightBrush;
+                codeEditor.TextArea.SelectionForeground = SystemColors.HighlightTextBrush;
             }
         }
         finally
@@ -356,6 +369,21 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         return brush;
     }
 
+    private static bool IsLightForeground(Brush foreground)
+    {
+        if (foreground is not SolidColorBrush solidColorBrush)
+        {
+            return false;
+        }
+
+        Color color = solidColorBrush.Color;
+        double luminance =
+            (0.2126 * color.R) +
+            (0.7152 * color.G) +
+            (0.0722 * color.B);
+        return luminance >= 160;
+    }
+
     private static bool IsListNavigationKey(Key key)
     {
         return key is Key.Up
@@ -404,4 +432,6 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         return null;
     }
 
+    private sealed record CodeBlockThemeState(
+        IHighlightingDefinition? SyntaxHighlighting);
 }

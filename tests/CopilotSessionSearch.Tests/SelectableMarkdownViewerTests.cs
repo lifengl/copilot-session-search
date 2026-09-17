@@ -7,11 +7,55 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using CopilotSessionSearch.Controls;
+using ICSharpCode.AvalonEdit;
 
 namespace CopilotSessionSearch.Tests;
 
 public sealed class SelectableMarkdownViewerTests
 {
+    [Fact]
+    public void ViewerUsesPlainCodeInDarkModeAndRestoresHighlightingInLightMode()
+    {
+        RunOnSta(
+            () =>
+            {
+                const string markdown =
+                    """
+                    ```csharp
+                    // ADDED: routes cached-state projects
+                    Verify.Operation(buildContext is not null);
+                    ```
+                    """;
+                var viewer = new SelectableMarkdownViewer
+                {
+                    Background = Brushes.Black,
+                    Foreground = Brushes.White,
+                    SourceMarkdown = markdown,
+                };
+                FlowDocument document = Assert.IsType<FlowDocument>(viewer.Document);
+                TextEditor editor = Assert.Single(
+                    EnumerateElements<TextEditor>(document));
+
+                Assert.Null(editor.SyntaxHighlighting);
+                Assert.Equal(Brushes.White, editor.Foreground);
+                Assert.Equal(Brushes.White, editor.TextArea.Foreground);
+                Assert.Equal(SystemColors.HighlightBrush, editor.TextArea.SelectionBrush);
+                Assert.Equal(
+                    SystemColors.HighlightTextBrush,
+                    editor.TextArea.SelectionForeground);
+
+                viewer.Foreground = Brushes.Black;
+
+                Assert.NotNull(editor.SyntaxHighlighting);
+                Assert.Equal(Brushes.Black, editor.Foreground);
+
+                viewer.Foreground = Brushes.White;
+
+                Assert.Null(editor.SyntaxHighlighting);
+                Assert.Equal(Brushes.White, editor.Foreground);
+            });
+    }
+
     [Fact]
     public void ViewerNormalizesMarkdownColorsForDarkAndLightForegrounds()
     {
