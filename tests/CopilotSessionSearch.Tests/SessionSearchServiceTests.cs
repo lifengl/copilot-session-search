@@ -26,6 +26,30 @@ public sealed class SessionSearchServiceTests
     }
 
     [Fact]
+    public void SearchPropagatesOptionsIntoResults()
+    {
+        SessionDocument document = CreateDocument(
+            new ConversationEntry(
+                "user",
+                ConversationSpeaker.User,
+                DateTimeOffset.Parse("2026-09-01"),
+                "Needle needle needles."));
+        var options = new SessionSearchOptions(
+            MatchWholeWord: true,
+            IsCaseSensitive: true);
+
+        SessionSearchResult? result = _searchService.Search(
+            document,
+            "needle",
+            options,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(options, result.Options);
+        Assert.Equal(1, result.MatchCount);
+    }
+
+    [Fact]
     public void SearchLimitsMainSamplesButKeepsEveryDetailSection()
     {
         SessionDocument document = CreateDocument(

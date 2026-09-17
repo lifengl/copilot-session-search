@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using CopilotSessionSearch.Models;
+using CopilotSessionSearch.Services;
 
 namespace CopilotSessionSearch.Controls;
 
@@ -21,6 +23,18 @@ public sealed class HighlightedTextBlock : TextBlock
         typeof(HighlightedTextBlock),
         new FrameworkPropertyMetadata(string.Empty, OnTextPropertyChanged));
 
+    public static readonly DependencyProperty MatchWholeWordProperty = DependencyProperty.Register(
+        nameof(MatchWholeWord),
+        typeof(bool),
+        typeof(HighlightedTextBlock),
+        new FrameworkPropertyMetadata(false, OnTextPropertyChanged));
+
+    public static readonly DependencyProperty IsCaseSensitiveProperty = DependencyProperty.Register(
+        nameof(IsCaseSensitive),
+        typeof(bool),
+        typeof(HighlightedTextBlock),
+        new FrameworkPropertyMetadata(false, OnTextPropertyChanged));
+
     public string SourceText
     {
         get => (string)GetValue(SourceTextProperty);
@@ -31,6 +45,18 @@ public sealed class HighlightedTextBlock : TextBlock
     {
         get => (string)GetValue(HighlightTextProperty);
         set => SetValue(HighlightTextProperty, value);
+    }
+
+    public bool MatchWholeWord
+    {
+        get => (bool)GetValue(MatchWholeWordProperty);
+        set => SetValue(MatchWholeWordProperty, value);
+    }
+
+    public bool IsCaseSensitive
+    {
+        get => (bool)GetValue(IsCaseSensitiveProperty);
+        set => SetValue(IsCaseSensitiveProperty, value);
     }
 
     private static void OnTextPropertyChanged(
@@ -58,20 +84,15 @@ public sealed class HighlightedTextBlock : TextBlock
             return;
         }
 
+        var options = new SessionSearchOptions(MatchWholeWord, IsCaseSensitive);
+        IReadOnlyList<int> matches = LiteralTextMatcher.FindMatches(
+            sourceText,
+            highlightText,
+            options);
         int contentStart = 0;
-        while (contentStart < sourceText.Length)
+
+        foreach (int matchStart in matches)
         {
-            int matchStart = sourceText.IndexOf(
-                highlightText,
-                contentStart,
-                StringComparison.OrdinalIgnoreCase);
-
-            if (matchStart < 0)
-            {
-                Inlines.Add(new Run(sourceText[contentStart..]));
-                break;
-            }
-
             if (matchStart > contentStart)
             {
                 Inlines.Add(new Run(sourceText[contentStart..matchStart]));
@@ -86,6 +107,11 @@ public sealed class HighlightedTextBlock : TextBlock
                 });
 
             contentStart = matchStart + highlightText.Length;
+        }
+
+        if (contentStart < sourceText.Length)
+        {
+            Inlines.Add(new Run(sourceText[contentStart..]));
         }
     }
 }

@@ -43,7 +43,8 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
             .Select(
                 group => new SessionDetailMessageViewModel(
                     group.ToArray(),
-                    result.Query))
+                    result.Query,
+                    result.Options))
             .OrderBy(message => message.MessageNumber)
             .ToArray();
         SelectedMessage = Messages.FirstOrDefault();

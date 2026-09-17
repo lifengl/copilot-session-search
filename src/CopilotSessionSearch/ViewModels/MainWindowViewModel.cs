@@ -27,6 +27,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+    [NotifyPropertyChangedFor(nameof(AreSearchOptionsEnabled))]
     private bool _isSearching;
 
     [ObservableProperty]
@@ -51,6 +52,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MatchSummaryText))]
     private int _matchingSessionCount;
+
+    [ObservableProperty]
+    private bool _matchWholeWord;
+
+    [ObservableProperty]
+    private bool _isCaseSensitive;
 
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
@@ -107,6 +114,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         ? "1 matched session"
         : $"{MatchingSessionCount:N0} matched sessions";
 
+    public bool AreSearchOptionsEnabled => !IsSearching;
+
     partial void OnSelectedThemeOptionChanged(ThemeOption value)
     {
         _themeService.Apply(value.Preference);
@@ -141,7 +150,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [RelayCommand(CanExecute = nameof(CanSearch))]
     private Task SearchAsync()
     {
-        _activeSearchTask = RunSearchAsync(SearchText.Trim());
+        var options = new SessionSearchOptions(
+            MatchWholeWord,
+            IsCaseSensitive);
+        _activeSearchTask = RunSearchAsync(SearchText.Trim(), options);
         return _activeSearchTask;
     }
 
@@ -198,7 +210,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         await _historySource.DisposeAsync().ConfigureAwait(false);
     }
 
-    private async Task RunSearchAsync(string query)
+    private async Task RunSearchAsync(
+        string query,
+        SessionSearchOptions options)
     {
         using var cancellationSource = new CancellationTokenSource();
         _searchCancellationSource = cancellationSource;
@@ -214,6 +228,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         {
             await foreach (SessionSearchUpdate update in _searchCoordinator.SearchAsync(
                 query,
+                options,
                 cancellationSource.Token))
             {
                 _latestProgress = update.Progress;

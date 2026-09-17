@@ -18,6 +18,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 - Shows an example watermark in the empty search field for first-time guidance.
+- Offers whole-word and case-sensitive literal search options from the Search dropdown.
 
 ## Requirements
 
@@ -57,6 +58,7 @@ Session name, ID, working directory, repository, dates, span, search query, and 
 - `Ctrl+F` focuses and selects the search text.
 - `Enter` in the search box starts a search.
 - `Alt+S` starts a search, `Alt+C` cancels an active search, and `Escape` also cancels.
+- `Alt+O` opens the Search options dropdown.
 - In either result list, `Up`, `Down`, `Page Up`, `Page Down`, `Home`, and `End` change selection and bring the selected item into view.
 - `Enter` on a session opens its detail window.
 - `Enter` on a detail message focuses its rendered Markdown.
@@ -79,6 +81,17 @@ The preference is stored atomically as readable JSON at `%LOCALAPPDATA%\CopilotS
 MdXaml emits some fixed light-theme colors, so `SelectableMarkdownViewer` normalizes headings, tables, code backgrounds, links, and other text elements against the active WPF foreground. This avoids white table rows and black headings when the application is dark.
 
 Fenced code blocks use AvalonEdit. Light mode retains its language syntax highlighting; Dark and High Contrast modes disable the fixed syntax palette and use selectable, theme-aware monospace text so every token remains readable.
+
+## Search options
+
+The dropdown beside Search contains two independent options:
+
+- **Match whole word** requires boundaries around queries that begin or end with a letter, digit, or underscore. This avoids matching short terms inside longer words or identifiers.
+- **Case sensitive** uses exact ordinal casing.
+
+The selected options are captured when Search starts, so changing them never changes a search already in progress. Cached session documents contain raw conversation text and remain reusable across option combinations.
+
+Regular-expression search is intentionally not implemented yet. It remains a possible advanced mode, but would require validation, timeout/cancellation safeguards, and separate highlighting behavior.
 
 ## Status bar
 

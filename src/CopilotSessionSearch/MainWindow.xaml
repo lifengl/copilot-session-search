@@ -23,7 +23,9 @@
             <Run Text="{Binding TimestampText, Mode=OneTime}" />
           </TextBlock>
           <controls:HighlightedTextBlock HighlightText="{Binding Query, Mode=OneTime}"
+                                         IsCaseSensitive="{Binding IsCaseSensitive, Mode=OneTime}"
                                          Margin="0,3,0,0"
+                                         MatchWholeWord="{Binding MatchWholeWord, Mode=OneTime}"
                                          MaxHeight="44"
                                          SourceText="{Binding PreviewText, Mode=OneTime}"
                                          TextTrimming="CharacterEllipsis"
@@ -134,32 +136,67 @@
             </TextBlock.Style>
           </TextBlock>
         </Grid>
-        <Button Grid.Column="1"
-                AutomationProperties.Name="Search"
-                Command="{Binding SearchCommand}"
-                IsDefault="True"
-                Margin="8,0,0,0"
-                MinWidth="88"
-                TabIndex="1"
-                ToolTip="Search (Enter or Alt+S)">
-          <StackPanel Orientation="Horizontal">
+        <Grid Grid.Column="1" Margin="8,0,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <Button AutomationProperties.Name="Search"
+                  Command="{Binding SearchCommand}"
+                  IsDefault="True"
+                  MinWidth="88"
+                  TabIndex="1"
+                  ToolTip="Search (Enter or Alt+S)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock FontFamily="Segoe Fluent Icons"
+                         FontSize="14"
+                         IsHitTestVisible="False"
+                         Text="&#xE721;"
+                         VerticalAlignment="Center" />
+              <AccessText Margin="5,0,0,0"
+                          Text="_Search"
+                          VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="SearchOptionsButton"
+                  Grid.Column="1"
+                  AutomationProperties.HelpText="Choose whole-word and case-sensitive matching"
+                  AutomationProperties.Name="Search options"
+                  Click="SearchOptionsButton_Click"
+                  IsEnabled="{Binding AreSearchOptionsEnabled}"
+                  Margin="1,0,0,0"
+                  MinWidth="30"
+                  Padding="4"
+                  TabIndex="2"
+                  ToolTip="Search options (Alt+O)">
+            <Button.ContextMenu>
+              <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Header="Match _whole word"
+                          IsCheckable="True"
+                          IsChecked="{Binding MatchWholeWord, Mode=TwoWay}"
+                          StaysOpenOnClick="True"
+                          ToolTip="Letters, digits, and underscore count as word characters" />
+                <MenuItem Header="_Case sensitive"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsCaseSensitive, Mode=TwoWay}"
+                          StaysOpenOnClick="True"
+                          ToolTip="Match uppercase and lowercase exactly" />
+              </ContextMenu>
+            </Button.ContextMenu>
             <TextBlock FontFamily="Segoe Fluent Icons"
-                       FontSize="14"
+                       FontSize="12"
                        IsHitTestVisible="False"
-                       Text="&#xE721;"
-                       VerticalAlignment="Center" />
-            <AccessText Margin="5,0,0,0"
-                        Text="_Search"
-                        VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+                       Text="&#xE70D;" />
+          </Button>
+        </Grid>
         <Button Grid.Column="2"
                 Command="{Binding CancelCommand}"
                 Content="_Cancel"
                 IsEnabled="{Binding IsSearching}"
                 Margin="8,0,0,0"
                 MinWidth="88"
-                TabIndex="2"
+                TabIndex="3"
                 ToolTip="Cancel search (Escape or Alt+C)" />
       </Grid>
 
@@ -194,7 +231,7 @@
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 SelectedItem="{Binding SelectedResult}"
                 SelectionMode="Single"
-                TabIndex="3"
+                TabIndex="4"
                 VirtualizingPanel.IsVirtualizing="True"
                 VirtualizingPanel.VirtualizationMode="Recycling" />
 
@@ -247,7 +284,7 @@
                   MinHeight="20"
                   MinWidth="26"
                   Padding="4,1"
-                  TabIndex="4"
+                  TabIndex="5"
                   ToolTip="{Binding ThemeMenuText}">
             <Button.ContextMenu>
               <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">

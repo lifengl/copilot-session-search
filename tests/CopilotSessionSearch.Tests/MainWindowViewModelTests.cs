@@ -35,6 +35,8 @@ public sealed class MainWindowViewModelTests
             themeService,
             themePreferenceStore)
         {
+            IsCaseSensitive = true,
+            MatchWholeWord = true,
             SearchText = "needle",
         };
 
@@ -46,6 +48,8 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.CancelCommand.CanExecute(null));
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
+        viewModel.IsCaseSensitive = false;
+        viewModel.MatchWholeWord = false;
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
 
         Assert.True(viewModel.IsSearching);
@@ -66,6 +70,13 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(3, viewModel.TotalSessionCount);
         Assert.Equal(3, viewModel.MatchingSessionCount);
         Assert.Equal("3 matched sessions", viewModel.MatchSummaryText);
+        Assert.All(
+            viewModel.Results,
+            result =>
+            {
+                Assert.True(result.Result.Options.IsCaseSensitive);
+                Assert.True(result.Result.Options.MatchWholeWord);
+            });
         Assert.Equal(
             [newest.SessionId, middle.SessionId, oldest.SessionId],
             viewModel.Results.Select(result => result.Result.Session.SessionId));

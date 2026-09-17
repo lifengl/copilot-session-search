@@ -6,18 +6,29 @@ namespace CopilotSessionSearch.ViewModels;
 
 public sealed class MatchSectionViewModel
 {
-    public MatchSectionViewModel(MatchSection section, string query)
+    public MatchSectionViewModel(
+        MatchSection section,
+        string query,
+        SessionSearchOptions options)
     {
         ArgumentNullException.ThrowIfNull(section);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(options);
 
         Section = section;
         Query = query;
+        Options = options;
     }
 
     public MatchSection Section { get; }
 
     public string Query { get; }
+
+    public SessionSearchOptions Options { get; }
+
+    public bool MatchWholeWord => Options.MatchWholeWord;
+
+    public bool IsCaseSensitive => Options.IsCaseSensitive;
 
     public string SpeakerText => Section.Speaker == ConversationSpeaker.User
         ? "You"

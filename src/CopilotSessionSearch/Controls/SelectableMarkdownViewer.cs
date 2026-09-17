@@ -8,6 +8,8 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using CopilotSessionSearch.Models;
+using CopilotSessionSearch.Services;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using MdXaml;
@@ -33,6 +35,18 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         typeof(SelectableMarkdownViewer),
         new FrameworkPropertyMetadata(string.Empty, OnMarkdownPropertyChanged));
 
+    public static readonly DependencyProperty MatchWholeWordProperty = DependencyProperty.Register(
+        nameof(MatchWholeWord),
+        typeof(bool),
+        typeof(SelectableMarkdownViewer),
+        new FrameworkPropertyMetadata(false, OnMarkdownPropertyChanged));
+
+    public static readonly DependencyProperty IsCaseSensitiveProperty = DependencyProperty.Register(
+        nameof(IsCaseSensitive),
+        typeof(bool),
+        typeof(SelectableMarkdownViewer),
+        new FrameworkPropertyMetadata(false, OnMarkdownPropertyChanged));
+
     public SelectableMarkdownViewer()
     {
         ClickAction = ClickAction.SafetyOpenBrowser;
@@ -50,6 +64,18 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         get => (string)GetValue(HighlightTextProperty);
         set => SetValue(HighlightTextProperty, value);
+    }
+
+    public bool MatchWholeWord
+    {
+        get => (bool)GetValue(MatchWholeWordProperty);
+        set => SetValue(MatchWholeWordProperty, value);
+    }
+
+    public bool IsCaseSensitive
+    {
+        get => (bool)GetValue(IsCaseSensitiveProperty);
+        set => SetValue(IsCaseSensitiveProperty, value);
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -280,10 +306,13 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         {
             var runs = new List<Run>();
             CollectElements(document, runs);
+            var options = new SessionSearchOptions(
+                MatchWholeWord,
+                IsCaseSensitive);
 
             foreach (Run run in runs)
             {
-                HighlightRun(run, highlightText);
+                HighlightRun(run, highlightText, options);
             }
         }
     }
@@ -308,27 +337,16 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         }
     }
 
-    private static void HighlightRun(Run run, string highlightText)
+    private static void HighlightRun(
+        Run run,
+        string highlightText,
+        SessionSearchOptions options)
     {
         string text = run.Text;
-        var matchStarts = new List<int>();
-        int searchStart = 0;
-
-        while (searchStart <= text.Length - highlightText.Length)
-        {
-            int matchStart = text.IndexOf(
-                highlightText,
-                searchStart,
-                StringComparison.OrdinalIgnoreCase);
-
-            if (matchStart < 0)
-            {
-                break;
-            }
-
-            matchStarts.Add(matchStart);
-            searchStart = matchStart + highlightText.Length;
-        }
+        IReadOnlyList<int> matchStarts = LiteralTextMatcher.FindMatches(
+            text,
+            highlightText,
+            options);
 
         for (int index = matchStarts.Count - 1; index >= 0; index--)
         {

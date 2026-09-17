@@ -8,10 +8,12 @@ public sealed class SessionDetailMessageViewModel
 {
     public SessionDetailMessageViewModel(
         IReadOnlyList<MatchSection> sections,
-        string query)
+        string query,
+        SessionSearchOptions options)
     {
         ArgumentNullException.ThrowIfNull(sections);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(options);
 
         if (sections.Count == 0)
         {
@@ -27,6 +29,7 @@ public sealed class SessionDetailMessageViewModel
         Timestamp = firstSection.Timestamp;
         MarkdownText = firstSection.FullText;
         Query = query;
+        Options = options;
         OccurrenceCount = sections.Sum(section => section.OccurrenceCount);
     }
 
@@ -41,6 +44,12 @@ public sealed class SessionDetailMessageViewModel
     public string MarkdownText { get; }
 
     public string Query { get; }
+
+    public SessionSearchOptions Options { get; }
+
+    public bool MatchWholeWord => Options.MatchWholeWord;
+
+    public bool IsCaseSensitive => Options.IsCaseSensitive;
 
     public int OccurrenceCount { get; }
 

@@ -41,11 +41,23 @@ public sealed class SessionSearchCoordinator
         _maximumConcurrency = resolvedMaximumConcurrency;
     }
 
+    public IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        return SearchAsync(
+            query,
+            SessionSearchOptions.Default,
+            cancellationToken);
+    }
+
     public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
         string query,
+        SessionSearchOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(options);
 
         IReadOnlyList<SessionDescriptor> sessions = await _historySource
             .GetSessionsAsync(cancellationToken)
@@ -60,7 +72,12 @@ public sealed class SessionSearchCoordinator
             });
 
         Task processingTask = Task.Run(
-            () => ProcessSessionsAsync(sessions, query.Trim(), updates.Writer, cancellationToken),
+            () => ProcessSessionsAsync(
+                sessions,
+                query.Trim(),
+                options,
+                updates.Writer,
+                cancellationToken),
             CancellationToken.None);
 
         try
@@ -90,6 +107,7 @@ public sealed class SessionSearchCoordinator
     private async Task ProcessSessionsAsync(
         IReadOnlyList<SessionDescriptor> sessions,
         string query,
+        SessionSearchOptions options,
         ChannelWriter<SessionSearchUpdate> updateWriter,
         CancellationToken cancellationToken)
     {
@@ -127,7 +145,11 @@ public sealed class SessionSearchCoordinator
                             _historySource.GetSessionDocumentAsync,
                             workerCancellationToken).ConfigureAwait(false);
 
-                        result = _searchService.Search(document, query, workerCancellationToken);
+                        result = _searchService.Search(
+                            document,
+                            query,
+                            options,
+                            workerCancellationToken);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {

@@ -12,7 +12,11 @@ public sealed class SessionSearchResultViewModel
 
         Result = result;
         Samples = result.Samples
-            .Select(section => new MatchSectionViewModel(section, result.Query))
+            .Select(
+                section => new MatchSectionViewModel(
+                    section,
+                    result.Query,
+                    result.Options))
             .ToArray();
     }
 

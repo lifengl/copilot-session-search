@@ -14,8 +14,22 @@ public sealed class SessionSearchService
         string query,
         CancellationToken cancellationToken)
     {
+        return Search(
+            document,
+            query,
+            SessionSearchOptions.Default,
+            cancellationToken);
+    }
+
+    public SessionSearchResult? Search(
+        SessionDocument document,
+        string query,
+        SessionSearchOptions options,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(options);
 
         string normalizedQuery = query.Trim();
         var sections = new List<MatchSection>();
@@ -26,7 +40,11 @@ public sealed class SessionSearchService
             cancellationToken.ThrowIfCancellationRequested();
 
             ConversationEntry entry = document.Entries[entryIndex];
-            IReadOnlyList<int> matches = FindMatches(entry.Content, normalizedQuery, cancellationToken);
+            IReadOnlyList<int> matches = LiteralTextMatcher.FindMatches(
+                entry.Content,
+                normalizedQuery,
+                options,
+                cancellationToken);
             if (matches.Count == 0)
             {
                 continue;
@@ -58,36 +76,12 @@ public sealed class SessionSearchService
 
         return sections.Count == 0
             ? null
-            : new SessionSearchResult(document, normalizedQuery, sections, matchCount);
-    }
-
-    private static IReadOnlyList<int> FindMatches(
-        string content,
-        string query,
-        CancellationToken cancellationToken)
-    {
-        var matches = new List<int>();
-        int searchStart = 0;
-
-        while (searchStart <= content.Length - query.Length)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            int matchStart = content.IndexOf(
-                query,
-                searchStart,
-                StringComparison.OrdinalIgnoreCase);
-
-            if (matchStart < 0)
-            {
-                break;
-            }
-
-            matches.Add(matchStart);
-            searchStart = matchStart + query.Length;
-        }
-
-        return matches;
+            : new SessionSearchResult(
+                document,
+                normalizedQuery,
+                options,
+                sections,
+                matchCount);
     }
 
     private static IReadOnlyList<MatchRange> CreateMatchRanges(

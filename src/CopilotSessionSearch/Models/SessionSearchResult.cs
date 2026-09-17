@@ -11,13 +11,30 @@ public sealed class SessionSearchResult
         string query,
         IEnumerable<MatchSection> sections,
         int matchCount)
+        : this(
+            document,
+            query,
+            SessionSearchOptions.Default,
+            sections,
+            matchCount)
+    {
+    }
+
+    public SessionSearchResult(
+        SessionDocument document,
+        string query,
+        SessionSearchOptions options,
+        IEnumerable<MatchSection> sections,
+        int matchCount)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(sections);
 
         Document = document;
         Query = query;
+        Options = options;
         Sections = sections.ToArray();
         Samples = Sections.Take(MaximumSamples).ToArray();
         MatchCount = matchCount;
@@ -28,6 +45,8 @@ public sealed class SessionSearchResult
     public SessionDescriptor Session => Document.Session;
 
     public string Query { get; }
+
+    public SessionSearchOptions Options { get; }
 
     public IReadOnlyList<MatchSection> Sections { get; }
 

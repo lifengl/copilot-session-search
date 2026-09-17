@@ -57,6 +57,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.SystemKey == Key.O
+            && Keyboard.Modifiers == ModifierKeys.Alt)
+        {
+            SearchOptionsButton.Focus();
+            OpenSearchOptionsMenu();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.F
             || Keyboard.Modifiers != ModifierKeys.Control)
         {
@@ -81,6 +90,22 @@ public partial class MainWindow : Window
         }
 
         contextMenu.PlacementTarget = ThemeMenuButton;
+        contextMenu.IsOpen = true;
+    }
+
+    private void SearchOptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSearchOptionsMenu();
+    }
+
+    private void OpenSearchOptionsMenu()
+    {
+        if (SearchOptionsButton.ContextMenu is not ContextMenu contextMenu)
+        {
+            return;
+        }
+
+        contextMenu.PlacementTarget = SearchOptionsButton;
         contextMenu.IsOpen = true;
     }
 
