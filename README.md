@@ -46,7 +46,7 @@ dotnet test CopilotSessionSearch.sln
 
 The application takes a snapshot of the available session list when the first search starts. It does not subscribe to session lifecycle updates, so sessions created or modified afterward appear after restarting the application.
 
-Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window starts with every matching conversation message and can switch to the complete cached conversation without reading the session again.
+Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window starts with every matching conversation message and can switch to the complete cached conversation without reading the session again. The complete view uses a compact speaker-and-content layout without the per-message timestamp, message number, match count, or bordered content box.
 
 Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` content. Headings, tables, lists, links, inline code, and fenced code blocks receive Markdown formatting. Select text and press Ctrl+C or use the document context menu. The clipboard retains WPF's plain-text, RTF, and XAML formats and adds HTML, allowing applications such as Word to preserve headings, emphasis, links, lists, inline code, and table structure. Plain-text consumers keep the existing copy behavior.
 

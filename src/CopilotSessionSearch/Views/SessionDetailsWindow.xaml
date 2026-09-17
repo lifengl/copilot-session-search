@@ -12,13 +12,35 @@
         WindowStartupLocation="CenterOwner">
   <Window.Resources>
     <DataTemplate x:Key="DetailMessageTemplate">
-      <Grid Margin="4">
+      <Grid>
+        <Grid.Style>
+          <Style TargetType="{x:Type Grid}">
+            <Setter Property="Margin" Value="4" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                           Value="True">
+                <Setter Property="Margin" Value="0" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock FontWeight="SemiBold">
+          <TextBlock.Style>
+            <Style TargetType="{x:Type TextBlock}">
+              <Setter Property="Visibility" Value="Visible" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                             Value="True">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
           <Run Text="{Binding SpeakerText, Mode=OneTime}" />
           <Run Text=" - " />
           <Run Text="{Binding TimestampText, Mode=OneTime}" />
@@ -28,11 +50,41 @@
           <Run Text="{Binding OccurrenceText, Mode=OneTime}" />
         </TextBlock>
 
-        <Border Grid.Row="1"
-                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
-                BorderThickness="1"
-                Margin="0,8,0,0"
-                Padding="8">
+        <TextBlock Grid.Row="0"
+                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                   FontSize="11"
+                   FontWeight="Normal"
+                   Text="{Binding SpeakerText, Mode=OneTime}">
+          <TextBlock.Style>
+            <Style TargetType="{x:Type TextBlock}">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                             Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+
+        <Border Grid.Row="1">
+          <Border.Style>
+            <Style TargetType="{x:Type Border}">
+              <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+              <Setter Property="BorderThickness" Value="1" />
+              <Setter Property="Margin" Value="0,8,0,0" />
+              <Setter Property="Padding" Value="8" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                             Value="True">
+                  <Setter Property="BorderThickness" Value="0" />
+                  <Setter Property="Margin" Value="0,2,0,0" />
+                  <Setter Property="Padding" Value="0" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
           <controls:SelectableMarkdownViewer AutomationProperties.Name="Rendered conversation message"
                                              Background="Transparent"
                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}"
@@ -57,6 +109,13 @@
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Padding" Value="8" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                     Value="True">
+          <Setter Property="Margin" Value="0,0,0,2" />
+          <Setter Property="Padding" Value="4,2" />
+        </DataTrigger>
+      </Style.Triggers>
     </Style>
 
     <Style x:Key="MetadataValueStyle" TargetType="{x:Type TextBox}">
