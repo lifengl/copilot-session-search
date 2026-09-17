@@ -9,7 +9,7 @@ namespace CopilotSessionSearch.Tests;
 public sealed class SessionDetailsViewModelTests
 {
     [Fact]
-    public void DetailsGroupDistantSectionsByMessageAndCopyFullText()
+    public void DetailsGroupDistantSectionsByMessageAndCopySessionInfo()
     {
         const string fullMessage = "## Heading\n\nA message containing needle in two places.";
         SessionSearchResult result = CreateResult(
@@ -72,13 +72,6 @@ public sealed class SessionDetailsViewModelTests
             "Session information was copied to the clipboard.",
             viewModel.StatusBarText);
 
-        viewModel.SelectedMessage = viewModel.Messages[0];
-        viewModel.CopySelectedMessageCommand.Execute(null);
-
-        Assert.Equal(fullMessage, clipboardService.Text);
-        Assert.Equal(
-            "The full message was copied to the clipboard.",
-            viewModel.StatusMessage);
         Assert.Null(viewModel.ErrorMessage);
     }
 

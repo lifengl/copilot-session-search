@@ -22,6 +22,7 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 
     private readonly ConditionalWeakTable<TextEditor, CodeBlockThemeState> _codeBlockThemes = new();
     private bool _isApplyingDocumentTheme;
+    private bool _isCopyingWholeMessage;
 
     public static readonly DependencyProperty SourceMarkdownProperty = DependencyProperty.Register(
         nameof(SourceMarkdown),
@@ -56,6 +57,7 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     public SelectableMarkdownViewer()
     {
         ClickAction = ClickAction.SafetyOpenBrowser;
+        DataObject.AddCopyingHandler(this, OnCopying);
         IsSelectionEnabled = true;
         IsToolBarVisible = false;
     }
@@ -88,6 +90,48 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         get => (bool)GetValue(UseRegularExpressionProperty);
         set => SetValue(UseRegularExpressionProperty, value);
+    }
+
+    public bool CopySelection()
+    {
+        if (Selection is not TextSelection selection
+            || selection.IsEmpty
+            || !ApplicationCommands.Copy.CanExecute(null, this))
+        {
+            return false;
+        }
+
+        ApplicationCommands.Copy.Execute(null, this);
+        return true;
+    }
+
+    public bool CopyWholeMessage()
+    {
+        if (Document is not FlowDocument document
+            || Selection is not TextSelection selection)
+        {
+            return false;
+        }
+
+        TextPointer selectionStart = selection.Start;
+        TextPointer selectionEnd = selection.End;
+        _isCopyingWholeMessage = true;
+        try
+        {
+            selection.Select(document.ContentStart, document.ContentEnd);
+            if (!ApplicationCommands.Copy.CanExecute(null, this))
+            {
+                return false;
+            }
+
+            ApplicationCommands.Copy.Execute(null, this);
+            return true;
+        }
+        finally
+        {
+            _isCopyingWholeMessage = false;
+            selection.Select(selectionStart, selectionEnd);
+        }
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -150,6 +194,46 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         var viewer = (SelectableMarkdownViewer)dependencyObject;
         viewer.RenderMarkdown();
+    }
+
+    private static void OnCopying(
+        object sender,
+        DataObjectCopyingEventArgs eventArgs)
+    {
+        var viewer = (SelectableMarkdownViewer)sender;
+        if (!eventArgs.DataObject.GetDataPresent(
+            DataFormats.Html,
+            autoConvert: false))
+        {
+            string? xaml = eventArgs.DataObject.GetData(
+                DataFormats.Xaml,
+                autoConvert: false) as string;
+            if (!string.IsNullOrWhiteSpace(xaml))
+            {
+                string htmlFragment = WpfXamlToHtmlConverter.Convert(xaml);
+                eventArgs.DataObject.SetData(
+                    DataFormats.Html,
+                    HtmlClipboardFormat.Create(htmlFragment),
+                    autoConvert: false);
+            }
+        }
+
+        if (viewer._isCopyingWholeMessage)
+        {
+            string markdown = viewer.SourceMarkdown ?? string.Empty;
+            eventArgs.DataObject.SetData(
+                DataFormats.Text,
+                markdown,
+                autoConvert: false);
+            eventArgs.DataObject.SetData(
+                DataFormats.UnicodeText,
+                markdown,
+                autoConvert: false);
+            eventArgs.DataObject.SetData(
+                DataFormats.StringFormat,
+                markdown,
+                autoConvert: false);
+        }
     }
 
     private void RenderMarkdown()

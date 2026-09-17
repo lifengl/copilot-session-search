@@ -261,12 +261,12 @@
                 MinWidth="132"
                 TabIndex="1"
                 ToolTip="Copy session metadata and resume command (Alt+I)" />
-        <Button Command="{Binding CopySelectedMessageCommand}"
-                Content="_Copy selected message"
+        <Button Click="CopyWholeMessageButton_Click"
+                Content="_Copy whole message"
                 Margin="8,0,0,0"
                 MinWidth="160"
                 TabIndex="2"
-                ToolTip="Copy the selected full message (Ctrl+C or Alt+C)" />
+                ToolTip="Copy the selected whole message with rich formatting and Markdown text (Alt+C)" />
         <Button Command="{Binding ResumeCommand}"
                 Content="_Resume in console"
                 Margin="8,0,0,0"

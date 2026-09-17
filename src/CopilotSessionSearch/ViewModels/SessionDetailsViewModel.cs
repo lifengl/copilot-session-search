@@ -23,7 +23,6 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     private string? _statusMessage;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CopySelectedMessageCommand))]
     private SessionDetailMessageViewModel? _selectedMessage;
 
     public SessionDetailsViewModel(
@@ -123,27 +122,6 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
             or UnauthorizedAccessException)
         {
             ErrorMessage = $"Unable to resume the session: {ex.Message}";
-            StatusMessage = null;
-        }
-    }
-
-    private bool CanCopySelectedMessage()
-    {
-        return SelectedMessage is not null;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanCopySelectedMessage))]
-    private void CopySelectedMessage()
-    {
-        try
-        {
-            _clipboardService.SetText(SelectedMessage!.MarkdownText);
-            ErrorMessage = null;
-            StatusMessage = "The full message was copied to the clipboard.";
-        }
-        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
-        {
-            ErrorMessage = $"Unable to copy the message: {ex.Message}";
             StatusMessage = null;
         }
     }

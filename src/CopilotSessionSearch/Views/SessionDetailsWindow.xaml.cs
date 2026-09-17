@@ -1,9 +1,12 @@
 #nullable enable
 
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Xml;
 using CopilotSessionSearch.Controls;
 using CopilotSessionSearch.ViewModels;
 
@@ -58,18 +61,14 @@ public partial class SessionDetailsWindow : Window
 
     private void MessagesListView_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var viewModel = (SessionDetailsViewModel)DataContext;
-
         if (e.Key == Key.C
-            && Keyboard.Modifiers == ModifierKeys.Control
-            && !IsFocusInsideMarkdownViewer())
+            && Keyboard.Modifiers == ModifierKeys.Control)
         {
-            if (viewModel.CopySelectedMessageCommand.CanExecute(null))
-            {
-                viewModel.CopySelectedMessageCommand.Execute(null);
-                e.Handled = true;
-            }
-
+            SelectableMarkdownViewer? focusedViewer = GetFocusedMarkdownViewer();
+            CopyRenderedContent(
+                focusedViewer ?? GetSelectedMarkdownViewer(),
+                preferSelection: focusedViewer is not null);
+            e.Handled = true;
             return;
         }
 
@@ -77,11 +76,7 @@ public partial class SessionDetailsWindow : Window
             && Keyboard.Modifiers == ModifierKeys.None
             && MessagesListView.SelectedItem is not null)
         {
-            ListViewItem? item = MessagesListView.ItemContainerGenerator.ContainerFromItem(
-                MessagesListView.SelectedItem) as ListViewItem;
-            SelectableMarkdownViewer? viewer = item is null
-                ? null
-                : FindVisualDescendant<SelectableMarkdownViewer>(item);
+            SelectableMarkdownViewer? viewer = GetSelectedMarkdownViewer();
 
             if (viewer is not null)
             {
@@ -89,6 +84,72 @@ public partial class SessionDetailsWindow : Window
                 e.Handled = true;
             }
         }
+    }
+
+    private void CopyWholeMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        CopyRenderedContent(
+            GetSelectedMarkdownViewer(),
+            preferSelection: false);
+    }
+
+    private void CopyRenderedContent(
+        SelectableMarkdownViewer? viewer,
+        bool preferSelection)
+    {
+        var viewModel = (SessionDetailsViewModel)DataContext;
+
+        try
+        {
+            bool copiedSelection =
+                preferSelection && viewer?.CopySelection() is true;
+            bool copied =
+                copiedSelection || viewer?.CopyWholeMessage() is true;
+
+            if (!copied)
+            {
+                viewModel.ErrorMessage =
+                    "Unable to copy the message because its rendered content is unavailable.";
+                viewModel.StatusMessage = null;
+                return;
+            }
+
+            viewModel.ErrorMessage = null;
+            viewModel.StatusMessage = copiedSelection
+                ? "The selected text was copied with rich formatting."
+                : "The whole message was copied with rich formatting.";
+        }
+        catch (Exception ex) when (
+            ex is ExternalException
+            or InvalidDataException
+            or InvalidOperationException
+            or XmlException)
+        {
+            viewModel.ErrorMessage = $"Unable to copy the message: {ex.Message}";
+            viewModel.StatusMessage = null;
+        }
+    }
+
+    private SelectableMarkdownViewer? GetSelectedMarkdownViewer()
+    {
+        if (MessagesListView.SelectedItem is null)
+        {
+            return null;
+        }
+
+        ListViewItem? item = MessagesListView.ItemContainerGenerator.ContainerFromItem(
+            MessagesListView.SelectedItem) as ListViewItem;
+        if (item is null)
+        {
+            MessagesListView.ScrollIntoView(MessagesListView.SelectedItem);
+            MessagesListView.UpdateLayout();
+            item = MessagesListView.ItemContainerGenerator.ContainerFromItem(
+                MessagesListView.SelectedItem) as ListViewItem;
+        }
+
+        return item is null
+            ? null
+            : FindVisualDescendant<SelectableMarkdownViewer>(item);
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -117,20 +178,20 @@ public partial class SessionDetailsWindow : Window
         (item as IInputElement ?? MessagesListView).Focus();
     }
 
-    private static bool IsFocusInsideMarkdownViewer()
+    private static SelectableMarkdownViewer? GetFocusedMarkdownViewer()
     {
         DependencyObject? current = Keyboard.FocusedElement as DependencyObject;
         while (current is not null)
         {
-            if (current is SelectableMarkdownViewer)
+            if (current is SelectableMarkdownViewer viewer)
             {
-                return true;
+                return viewer;
             }
 
             current = VisualTreeHelper.GetParent(current);
         }
 
-        return false;
+        return null;
     }
 
     private static T? FindVisualDescendant<T>(DependencyObject parent)

@@ -57,6 +57,62 @@ public sealed class SelectableMarkdownViewerTests
     }
 
     [Fact]
+    public void CopyWholeMessageAddsRichFormatsAndMarkdownText()
+    {
+        RunOnSta(
+            () =>
+            {
+                const string markdown =
+                    """
+                    ## Heading
+
+                    | Name | Value |
+                    |---|---|
+                    | Alpha | One |
+                    """;
+                var viewer = new SelectableMarkdownViewer
+                {
+                    SourceMarkdown = markdown,
+                };
+                PrepareViewer(viewer);
+                FlowDocument document = Assert.IsType<FlowDocument>(viewer.Document);
+                TextSelection selection = Assert.IsType<TextSelection>(viewer.Selection);
+                Run heading = Assert.Single(
+                    EnumerateRuns(document),
+                    run => run.Text == "Heading");
+                selection.Select(heading.ContentStart, heading.ContentEnd);
+
+                IDataObject dataObject = CaptureCopyData(
+                    viewer,
+                    viewer.CopyWholeMessage);
+
+                Assert.Equal(
+                    markdown,
+                    dataObject.GetData(
+                        DataFormats.UnicodeText,
+                        autoConvert: false));
+                Assert.Equal(
+                    markdown,
+                    dataObject.GetData(
+                        DataFormats.Text,
+                        autoConvert: false));
+                Assert.Equal(
+                    markdown,
+                    dataObject.GetData(
+                        DataFormats.StringFormat,
+                        autoConvert: false));
+                string html = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Html,
+                        autoConvert: false));
+                Assert.Contains("<h2>Heading</h2>", html, StringComparison.Ordinal);
+                Assert.Contains("<table ", html, StringComparison.Ordinal);
+                Assert.Contains("Alpha", html, StringComparison.Ordinal);
+                Assert.Equal("Heading", selection.Text);
+            });
+    }
+
+    [Fact]
     public void ViewerNormalizesMarkdownColorsForDarkAndLightForegrounds()
     {
         RunOnSta(
@@ -239,6 +295,144 @@ public sealed class SelectableMarkdownViewerTests
 
                 AssertHighlighted(hotReload, "HotReload");
                 AssertHighlighted(hotReloadWithSpace, "hot reload");
+            });
+    }
+
+    [Fact]
+    public void CopyAddsWordCompatibleHtmlAndPreservesExistingFormats()
+    {
+        RunOnSta(
+            () =>
+            {
+                const string markdown =
+                    """
+                    ## Heading
+
+                    This has **bold**, *italic*, a [link](https://example.test), and `inline code`.
+
+                    1. First
+                    2. Second
+
+                    | Name | Value |
+                    |---|---|
+                    | Alpha | One |
+                    | Beta | Two |
+                    """;
+                var viewer = new SelectableMarkdownViewer
+                {
+                    SourceMarkdown = markdown,
+                };
+
+                IDataObject dataObject = CopyAllWithoutUsingClipboard(viewer);
+
+                Assert.True(
+                    dataObject.GetDataPresent(
+                        DataFormats.Text,
+                        autoConvert: false));
+                Assert.True(
+                    dataObject.GetDataPresent(
+                        DataFormats.Rtf,
+                        autoConvert: false));
+                Assert.True(
+                    dataObject.GetDataPresent(
+                        DataFormats.Xaml,
+                        autoConvert: false));
+                Assert.True(
+                    dataObject.GetDataPresent(
+                        DataFormats.Html,
+                        autoConvert: false));
+
+                string html = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Html,
+                        autoConvert: false));
+                Assert.Contains("<h2>Heading</h2>", html, StringComparison.Ordinal);
+                Assert.Contains("<strong>bold</strong>", html, StringComparison.Ordinal);
+                Assert.Contains("<em>italic</em>", html, StringComparison.Ordinal);
+                Assert.Contains(
+                    "<a href=\"https://example.test/\">link</a>",
+                    html,
+                    StringComparison.Ordinal);
+                Assert.Contains("<code ", html, StringComparison.Ordinal);
+                Assert.Contains(">inline code</code>", html, StringComparison.Ordinal);
+                Assert.Contains("<ol>", html, StringComparison.Ordinal);
+                Assert.Contains(
+                    "<li><div style=\"margin:0\">First</div></li>",
+                    html,
+                    StringComparison.Ordinal);
+                Assert.Contains("<table ", html, StringComparison.Ordinal);
+                Assert.Contains("<th ", html, StringComparison.Ordinal);
+                Assert.Contains(
+                    ">Name</div></th>",
+                    html,
+                    StringComparison.Ordinal);
+                Assert.Contains("<td ", html, StringComparison.Ordinal);
+                Assert.Contains(
+                    ">Alpha</div></td>",
+                    html,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    private static IDataObject CopyAllWithoutUsingClipboard(
+        SelectableMarkdownViewer viewer)
+    {
+        PrepareViewer(viewer);
+        FlowDocument document = Assert.IsType<FlowDocument>(viewer.Document);
+        TextSelection selection = Assert.IsType<TextSelection>(viewer.Selection);
+        selection.Select(document.ContentStart, document.ContentEnd);
+
+        return CaptureCopyData(viewer, viewer.CopySelection);
+    }
+
+    private static IDataObject CaptureCopyData(
+        SelectableMarkdownViewer viewer,
+        Func<bool> copy)
+    {
+        IDataObject? copiedData = null;
+        DataObjectCopyingEventHandler handler = (_, eventArgs) =>
+        {
+            copiedData = eventArgs.DataObject;
+            eventArgs.CancelCommand();
+        };
+        DataObject.AddCopyingHandler(viewer, handler);
+
+        try
+        {
+            Assert.True(copy());
+        }
+        finally
+        {
+            DataObject.RemoveCopyingHandler(viewer, handler);
+        }
+
+        return Assert.IsAssignableFrom<IDataObject>(copiedData);
+    }
+
+    private static void PrepareViewer(SelectableMarkdownViewer viewer)
+    {
+        viewer.ApplyTemplate();
+        viewer.Measure(new Size(800, 600));
+        viewer.Arrange(new Rect(0, 0, 800, 600));
+        viewer.UpdateLayout();
+    }
+
+    [Fact]
+    public void CopySelectionReturnsFalseWithoutSelectedText()
+    {
+        RunOnSta(
+            () =>
+            {
+                var viewer = new SelectableMarkdownViewer
+                {
+                    SourceMarkdown = "Nothing is selected.",
+                };
+                viewer.ApplyTemplate();
+                viewer.Measure(new Size(800, 600));
+                viewer.Arrange(new Rect(0, 0, 800, 600));
+                viewer.UpdateLayout();
+
+                Assert.False(viewer.CopySelection());
             });
     }
 

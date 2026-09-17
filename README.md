@@ -47,7 +47,9 @@ The application takes a snapshot of the available session list when the first se
 
 Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window groups matching sections by conversation message and shows every matching message.
 
-Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` content. Headings, tables, lists, links, inline code, and fenced code blocks receive Markdown formatting. Select text and press Ctrl+C, use the document context menu, or choose **Copy full message**.
+Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` content. Headings, tables, lists, links, inline code, and fenced code blocks receive Markdown formatting. Select text and press Ctrl+C or use the document context menu. The clipboard retains WPF's plain-text, RTF, and XAML formats and adds HTML, allowing applications such as Word to preserve headings, emphasis, links, lists, inline code, and table structure. Plain-text consumers keep the existing copy behavior.
+
+The **Copy whole message** button copies the entire rendered conversation message with rich formats while retaining the original Markdown as the clipboard's plain-text representation. Word and other rich editors can preserve tables and formatting, while Markdown-oriented tools receive the original source.
 
 Markdown image syntax is converted into an ordinary link before rendering, and raw HTML image elements are escaped. This prevents the viewer from automatically fetching remote or local image content.
 
@@ -63,7 +65,7 @@ Session name, ID, working directory, repository, dates, span, search query, and 
 - `Enter` on a session opens its detail window.
 - `Enter` on a detail message focuses its rendered Markdown.
 - `Escape` closes the detail window from the message list, rendered Markdown, or footer buttons.
-- `Ctrl+C` on a selected detail message copies the full original Markdown. When rendered text has focus, `Ctrl+C` copies the selected text instead.
+- `Ctrl+C` copies a non-empty rendered-text selection with rich clipboard formats. Otherwise, on a selected detail message, it performs the same rich whole-message copy as **Copy whole message**.
 - In the detail window, `Alt+I` copies session information, `Alt+C` copies the selected message, `Alt+R` resumes the session, and `Alt+O` closes the window.
 - The mouse wheel over rendered Markdown scrolls the message list. Long messages keep their own scrollbar for direct scrolling.
 - The detail message list keeps its outer scrollbar visible and uses pixel scrolling for partially visible messages.
