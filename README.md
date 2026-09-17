@@ -56,6 +56,8 @@ Markdown image syntax is converted into an ordinary link before rendering, and r
 
 Session name, ID, working directory, repository, dates, span, search query, and `copilot --resume=<session-id>` command are selectable read-only fields. **Copy session info** places all of those values into the clipboard as a shell-friendly text block.
 
+The session-information section starts expanded and uses a compact disclosure button beside the selectable session name. Collapse it to leave more room for the conversation; the name remains visible.
+
 ## Keyboard and mouse
 
 - `Ctrl+F` focuses and selects the search text.

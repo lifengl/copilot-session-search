@@ -35,6 +35,10 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(MessageViewMenuText))]
     private bool _isShowingWholeConversation;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SessionInfoButtonText))]
+    private bool _isSessionInfoExpanded = true;
+
     public SessionDetailsViewModel(
         SessionSearchResult result,
         IConsoleLauncher consoleLauncher,
@@ -133,6 +137,17 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     public string MessageViewMenuText => IsShowingWholeConversation
         ? "View: Whole conversation"
         : "View: Matching messages";
+
+    public string SessionInfoButtonText => IsSessionInfoExpanded
+        ? "Collapse session information"
+        : "Expand session information";
+
+    [RelayCommand]
+    private void ToggleSessionInfo()
+    {
+        IsSessionInfoExpanded = !IsSessionInfoExpanded;
+        MessageViewChanged?.Invoke();
+    }
 
     [RelayCommand]
     private void ShowMatchingMessages()

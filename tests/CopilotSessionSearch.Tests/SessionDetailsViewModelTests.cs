@@ -136,6 +136,43 @@ public sealed class SessionDetailsViewModelTests
         Assert.Equal(4, viewChangeCount);
     }
 
+    [Fact]
+    public void SessionInformationExpansionIsLocalToTheDetailView()
+    {
+        SessionSearchResult result = CreateResult(
+            [
+                new MatchSection(
+                    "event-1",
+                    1,
+                    ConversationSpeaker.Copilot,
+                    DateTimeOffset.Parse("2026-09-01T10:00:00Z"),
+                    "needle",
+                    "needle",
+                    "A message containing needle.",
+                    1,
+                    false),
+            ]);
+        var viewModel = new SessionDetailsViewModel(
+            result,
+            new NoOpConsoleLauncher(),
+            new RecordingClipboardService());
+        int viewChangeCount = 0;
+        viewModel.MessageViewChanged += () => viewChangeCount++;
+
+        Assert.True(viewModel.IsSessionInfoExpanded);
+        Assert.Equal("Collapse session information", viewModel.SessionInfoButtonText);
+
+        viewModel.ToggleSessionInfoCommand.Execute(null);
+
+        Assert.False(viewModel.IsSessionInfoExpanded);
+        Assert.Equal("Expand session information", viewModel.SessionInfoButtonText);
+
+        viewModel.ToggleSessionInfoCommand.Execute(null);
+
+        Assert.True(viewModel.IsSessionInfoExpanded);
+        Assert.Equal(2, viewChangeCount);
+    }
+
     private static SessionSearchResult CreateResult(IReadOnlyList<MatchSection> sections)
     {
         SessionDescriptor descriptor = CreateDescriptor();

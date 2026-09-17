@@ -150,133 +150,171 @@
 
       <Border BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
               BorderThickness="1"
-              Padding="12">
+              Padding="4,2">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
 
-          <TextBox Grid.ColumnSpan="2"
-                   AutomationProperties.Name="Session name"
+          <Button Grid.Column="1"
+                  AutomationProperties.HelpText="Show or hide session information"
+                  AutomationProperties.Name="{Binding SessionInfoButtonText}"
+                  Background="Transparent"
+                  BorderBrush="Transparent"
+                  BorderThickness="0"
+                  Command="{Binding ToggleSessionInfoCommand}"
+                  Margin="6,0,0,0"
+                  MinHeight="24"
+                  MinWidth="24"
+                  Padding="4"
+                  ToolTip="{Binding SessionInfoButtonText}">
+            <TextBlock FontFamily="Segoe Fluent Icons"
+                       FontSize="12"
+                       Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                       IsHitTestVisible="False">
+              <TextBlock.Style>
+                <Style TargetType="{x:Type TextBlock}">
+                  <Setter Property="Text" Value="&#xE70D;" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSessionInfoExpanded}" Value="True">
+                      <Setter Property="Text" Value="&#xE70E;" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Button>
+
+          <TextBox AutomationProperties.Name="Session name"
                    FontSize="18"
                    FontWeight="SemiBold"
                    Style="{StaticResource MetadataValueStyle}"
                    Text="{Binding Name, Mode=OneTime}" />
 
-          <TextBlock x:Name="SessionIdLabel"
-                     Grid.Row="1"
-                     FontWeight="SemiBold"
-                     Margin="0,8,12,0"
-                     Text="Session ID:" />
-          <TextBox Grid.Row="1"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=SessionIdLabel}"
-                   Margin="0,8,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding SessionId, Mode=OneTime}" />
+          <Grid Grid.Row="1"
+                Grid.ColumnSpan="2"
+                Margin="0,4,0,0"
+                Visibility="{Binding IsSessionInfoExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-          <TextBlock x:Name="WorkingDirectoryLabel"
-                     Grid.Row="2"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Working directory:" />
-          <TextBox Grid.Row="2"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=WorkingDirectoryLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding WorkingDirectory, Mode=OneTime}" />
+            <TextBlock x:Name="SessionIdLabel"
+                       FontWeight="SemiBold"
+                       Margin="0,0,12,0"
+                       Text="Session ID:" />
+            <TextBox Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=SessionIdLabel}"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding SessionId, Mode=OneTime}" />
 
-          <TextBlock x:Name="RepositoryLabel"
-                     Grid.Row="3"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Repository:" />
-          <TextBox Grid.Row="3"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=RepositoryLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding RepositoryAndBranch, Mode=OneTime}" />
+            <TextBlock x:Name="WorkingDirectoryLabel"
+                       Grid.Row="1"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Working directory:" />
+            <TextBox Grid.Row="1"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=WorkingDirectoryLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding WorkingDirectory, Mode=OneTime}" />
 
-          <TextBlock x:Name="StartedLabel"
-                     Grid.Row="4"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Started:" />
-          <TextBox Grid.Row="4"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=StartedLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding StartTimeText, Mode=OneTime}" />
+            <TextBlock x:Name="RepositoryLabel"
+                       Grid.Row="2"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Repository:" />
+            <TextBox Grid.Row="2"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=RepositoryLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding RepositoryAndBranch, Mode=OneTime}" />
 
-          <TextBlock x:Name="LastActiveLabel"
-                     Grid.Row="5"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Last active:" />
-          <TextBox Grid.Row="5"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=LastActiveLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding LastActiveText, Mode=OneTime}" />
+            <TextBlock x:Name="StartedLabel"
+                       Grid.Row="3"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Started:" />
+            <TextBox Grid.Row="3"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=StartedLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding StartTimeText, Mode=OneTime}" />
 
-          <TextBlock x:Name="SessionSpanLabel"
-                     Grid.Row="6"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Session span:" />
-          <TextBox Grid.Row="6"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=SessionSpanLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding SessionSpanSummaryText, Mode=OneTime}" />
+            <TextBlock x:Name="LastActiveLabel"
+                       Grid.Row="4"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Last active:" />
+            <TextBox Grid.Row="4"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=LastActiveLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding LastActiveText, Mode=OneTime}" />
 
-          <TextBlock x:Name="SearchLabel"
-                     Grid.Row="7"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Search:" />
-          <TextBox Grid.Row="7"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding SearchSummaryText, Mode=OneTime}" />
+            <TextBlock x:Name="SessionSpanLabel"
+                       Grid.Row="5"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Session span:" />
+            <TextBox Grid.Row="5"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=SessionSpanLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding SessionSpanSummaryText, Mode=OneTime}" />
 
-          <TextBlock x:Name="ResumeCommandLabel"
-                     Grid.Row="8"
-                     FontWeight="SemiBold"
-                     Margin="0,4,12,0"
-                     Text="Resume command:" />
-          <TextBox Grid.Row="8"
-                   Grid.Column="1"
-                   AutomationProperties.LabeledBy="{Binding ElementName=ResumeCommandLabel}"
-                   FontFamily="Consolas"
-                   Margin="0,4,0,0"
-                   Style="{StaticResource MetadataValueStyle}"
-                   Text="{Binding ResumeCommandText, Mode=OneTime}" />
+            <TextBlock x:Name="SearchLabel"
+                       Grid.Row="6"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Search:" />
+            <TextBox Grid.Row="6"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding SearchSummaryText, Mode=OneTime}" />
+
+            <TextBlock x:Name="ResumeCommandLabel"
+                       Grid.Row="7"
+                       FontWeight="SemiBold"
+                       Margin="0,4,12,0"
+                       Text="Resume command:" />
+            <TextBox Grid.Row="7"
+                     Grid.Column="1"
+                     AutomationProperties.LabeledBy="{Binding ElementName=ResumeCommandLabel}"
+                     FontFamily="Consolas"
+                     Margin="0,4,0,0"
+                     Style="{StaticResource MetadataValueStyle}"
+                     Text="{Binding ResumeCommandText, Mode=OneTime}" />
+          </Grid>
         </Grid>
       </Border>
 
       <ListView x:Name="MessagesListView"
                 Grid.Row="1"
-                AutomationProperties.Name="Matching conversation messages"
+                AutomationProperties.Name="Conversation messages"
                 ItemContainerStyle="{StaticResource DetailItemStyle}"
                 ItemTemplate="{StaticResource DetailMessageTemplate}"
                 ItemsSource="{Binding Messages}"
