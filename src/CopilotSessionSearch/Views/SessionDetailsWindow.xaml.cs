@@ -99,17 +99,6 @@ public partial class SessionDetailsWindow : Window
             preferSelection: false);
     }
 
-    private void MessageViewMenuButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (MessageViewMenuButton.ContextMenu is not ContextMenu contextMenu)
-        {
-            return;
-        }
-
-        contextMenu.PlacementTarget = MessageViewMenuButton;
-        contextMenu.IsOpen = true;
-    }
-
     private void OnMessageViewChanged()
     {
         _ = Dispatcher.BeginInvoke(

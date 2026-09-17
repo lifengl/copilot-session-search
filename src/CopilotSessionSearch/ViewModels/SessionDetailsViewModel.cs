@@ -32,7 +32,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsShowingMatchingMessages))]
-    [NotifyPropertyChangedFor(nameof(MessageViewMenuText))]
+    [NotifyPropertyChangedFor(nameof(MessageViewButtonText))]
     private bool _isShowingWholeConversation;
 
     [ObservableProperty]
@@ -134,9 +134,9 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
 
     public bool IsShowingMatchingMessages => !IsShowingWholeConversation;
 
-    public string MessageViewMenuText => IsShowingWholeConversation
-        ? "View: Whole conversation"
-        : "View: Matching messages";
+    public string MessageViewButtonText => IsShowingWholeConversation
+        ? "Whole conversation"
+        : "Matching messages";
 
     public string SessionInfoButtonText => IsSessionInfoExpanded
         ? "Collapse session information"
@@ -150,15 +150,9 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ShowMatchingMessages()
+    private void ToggleMessageView()
     {
-        SetMessageView(showWholeConversation: false);
-    }
-
-    [RelayCommand]
-    private void ShowWholeConversation()
-    {
-        SetMessageView(showWholeConversation: true);
+        SetMessageView(!IsShowingWholeConversation);
     }
 
     [RelayCommand]

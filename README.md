@@ -108,7 +108,7 @@ The bottom status bar keeps secondary information out of the primary search row.
 - The total number of matched sessions.
 - A compact icon-only theme button. Its menu shows monitor **System**, sun **Light**, and crescent **Dark** choices with text and checkmarks.
 
-The detail window has its own narrow status bar for keyboard guidance and transient copy confirmations, keeping instructions out of the session metadata. Its compact view button switches that window between matching messages and the whole conversation; the choice is not persisted.
+The detail window has its own narrow status bar for keyboard guidance and transient copy confirmations, keeping instructions out of the session metadata. Clicking its compact filter/list view button toggles that window directly between matching messages and the whole conversation; the choice is not persisted.
 
 ## Application icon
 

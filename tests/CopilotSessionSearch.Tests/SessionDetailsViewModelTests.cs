@@ -108,29 +108,29 @@ public sealed class SessionDetailsViewModelTests
 
         Assert.True(viewModel.IsShowingMatchingMessages);
         Assert.False(viewModel.IsShowingWholeConversation);
-        Assert.Equal("View: Matching messages", viewModel.MessageViewMenuText);
+        Assert.Equal("Matching messages", viewModel.MessageViewButtonText);
         Assert.Equal([2, 5], viewModel.Messages.Select(message => message.MessageNumber));
 
         SessionDetailMessageViewModel matchingMessage = viewModel.Messages[1];
         viewModel.SelectedMessage = matchingMessage;
-        viewModel.ShowWholeConversationCommand.Execute(null);
+        viewModel.ToggleMessageViewCommand.Execute(null);
 
         Assert.True(viewModel.IsShowingWholeConversation);
-        Assert.Equal("View: Whole conversation", viewModel.MessageViewMenuText);
+        Assert.Equal("Whole conversation", viewModel.MessageViewButtonText);
         Assert.Equal(5, viewModel.Messages.Count);
         Assert.Equal(0, viewModel.Messages[0].OccurrenceCount);
         Assert.Same(matchingMessage, viewModel.SelectedMessage);
 
         viewModel.SelectedMessage = viewModel.Messages[3];
-        viewModel.ShowMatchingMessagesCommand.Execute(null);
+        viewModel.ToggleMessageViewCommand.Execute(null);
 
         Assert.True(viewModel.IsShowingMatchingMessages);
         Assert.Equal([2, 5], viewModel.Messages.Select(message => message.MessageNumber));
         Assert.Equal(5, viewModel.SelectedMessage?.MessageNumber);
 
-        viewModel.ShowWholeConversationCommand.Execute(null);
+        viewModel.ToggleMessageViewCommand.Execute(null);
         viewModel.SelectedMessage = viewModel.Messages[2];
-        viewModel.ShowMatchingMessagesCommand.Execute(null);
+        viewModel.ToggleMessageViewCommand.Execute(null);
 
         Assert.Equal(2, viewModel.SelectedMessage?.MessageNumber);
         Assert.Equal(4, viewChangeCount);

@@ -409,40 +409,16 @@
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center" />
 
-          <Button x:Name="MessageViewMenuButton"
-                  Grid.Column="1"
+          <Button Grid.Column="1"
                   AutomationProperties.HelpText="Switch between matching messages and the whole conversation"
-                  AutomationProperties.Name="{Binding MessageViewMenuText}"
-                  Click="MessageViewMenuButton_Click"
+                  AutomationProperties.Name="{Binding MessageViewButtonText}"
+                  Command="{Binding ToggleMessageViewCommand}"
                   Margin="8,0,0,0"
                   MinHeight="20"
                   MinWidth="26"
                   Padding="4,1"
                   TabIndex="5"
-                  ToolTip="{Binding MessageViewMenuText}">
-            <Button.ContextMenu>
-              <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                <MenuItem Command="{Binding ShowMatchingMessagesCommand}"
-                          Header="_Matching messages"
-                          IsCheckable="True"
-                          IsChecked="{Binding IsShowingMatchingMessages, Mode=OneWay}">
-                  <MenuItem.Icon>
-                    <controls:ConversationViewGlyph Height="14"
-                                                    Width="14" />
-                  </MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Command="{Binding ShowWholeConversationCommand}"
-                          Header="_Whole conversation"
-                          IsCheckable="True"
-                          IsChecked="{Binding IsShowingWholeConversation, Mode=OneWay}">
-                  <MenuItem.Icon>
-                    <controls:ConversationViewGlyph Height="14"
-                                                    IsWholeConversation="True"
-                                                    Width="14" />
-                  </MenuItem.Icon>
-                </MenuItem>
-              </ContextMenu>
-            </Button.ContextMenu>
+                  ToolTip="{Binding MessageViewButtonText}">
             <controls:ConversationViewGlyph Height="14"
                                             IsHitTestVisible="False"
                                             IsWholeConversation="{Binding IsShowingWholeConversation}"
