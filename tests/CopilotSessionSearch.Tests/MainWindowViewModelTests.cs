@@ -9,6 +9,36 @@ namespace CopilotSessionSearch.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public async Task SearchRemainsEnabledForAnEmptyQueryWithoutStartingWork()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var viewModel = new MainWindowViewModel(
+            new SessionSearchCoordinator(
+                historySource,
+                new SessionDocumentCache(),
+                new SessionSearchService()),
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore());
+
+        Assert.True(viewModel.SearchCommand.CanExecute(null));
+        Assert.True(viewModel.AreSearchInputsEnabled);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
+
+        await viewModel.SearchCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsSearching);
+        Assert.Equal(0, historySource.GetSessionsCallCount);
+        Assert.Equal(
+            "Enter text to search local Copilot sessions.",
+            viewModel.StatusText);
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
     public async Task ResultsStreamWhileSearchingAndRemainSortedByLastActivity()
     {
         SessionDescriptor oldest = CreateDescriptor("oldest", 1);
@@ -46,6 +76,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(AppThemePreference.Dark, themeService.CurrentPreference);
         Assert.Equal(AppThemePreference.Dark, themePreferenceStore.SavedPreference);
         Assert.True(viewModel.IsDarkTheme);
+        Assert.True(viewModel.AreSearchInputsEnabled);
         Assert.False(viewModel.CancelCommand.CanExecute(null));
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
@@ -55,6 +86,7 @@ public sealed class MainWindowViewModelTests
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
 
         Assert.True(viewModel.IsSearching);
+        Assert.False(viewModel.AreSearchInputsEnabled);
         Assert.True(viewModel.CancelCommand.CanExecute(null));
 
         SessionSearchResult? openedResult = null;
@@ -66,6 +98,7 @@ public sealed class MainWindowViewModelTests
         await searchTask;
 
         Assert.False(viewModel.IsSearching);
+        Assert.True(viewModel.AreSearchInputsEnabled);
         Assert.False(viewModel.CancelCommand.CanExecute(null));
         Assert.NotNull(viewModel.SelectedResult);
         Assert.Equal(3, viewModel.CompletedSessionCount);

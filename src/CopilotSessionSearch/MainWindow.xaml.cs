@@ -100,7 +100,8 @@ public partial class MainWindow : Window
 
     private void OpenSearchOptionsMenu()
     {
-        if (SearchOptionsButton.ContextMenu is not ContextMenu contextMenu)
+        if (!SearchOptionsButton.IsEnabled
+            || SearchOptionsButton.ContextMenu is not ContextMenu contextMenu)
         {
             return;
         }

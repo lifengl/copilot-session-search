@@ -22,13 +22,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private bool _disposed;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     private string _searchText = string.Empty;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
-    [NotifyPropertyChangedFor(nameof(AreSearchOptionsEnabled))]
+    [NotifyPropertyChangedFor(nameof(AreSearchInputsEnabled))]
     private bool _isSearching;
 
     [ObservableProperty]
@@ -118,7 +117,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         ? "1 matched session"
         : $"{MatchingSessionCount:N0} matched sessions";
 
-    public bool AreSearchOptionsEnabled => !IsSearching;
+    public bool AreSearchInputsEnabled => !IsSearching;
 
     partial void OnSelectedThemeOptionChanged(ThemeOption value)
     {
@@ -147,13 +146,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private bool CanSearch()
     {
         return !_disposed
-            && !IsSearching
-            && !string.IsNullOrWhiteSpace(SearchText);
+            && !IsSearching;
     }
 
     [RelayCommand(CanExecute = nameof(CanSearch))]
     private Task SearchAsync()
     {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            ErrorMessage = null;
+            StatusText = "Enter text to search local Copilot sessions.";
+            return Task.CompletedTask;
+        }
+
         var options = new SessionSearchOptions(
             MatchWholeWord: MatchWholeWord,
             IsCaseSensitive: IsCaseSensitive,

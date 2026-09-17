@@ -92,7 +92,7 @@ The dropdown beside Search contains three independent options:
 - **Case sensitive** uses exact casing. When it is off, regular expressions use `RegexOptions.IgnoreCase` with culture-invariant matching, so patterns do not need constructs such as `[hH]`.
 - **Use regular expression** is separated as the final advanced option and interprets the search text as a .NET regular expression. For example, `hot ?reload` matches both `HotReload` and `hot reload` when **Case sensitive** is off.
 
-The selected options are captured when Search starts, so changing them never changes a search already in progress. Cached session documents contain raw conversation text and remain reusable across option combinations.
+The Search button is enabled when the window opens even if the query is empty, while keyboard focus starts in the query box. Activating Search with no text is a harmless no-op. Once a real search starts, the selected query and options are captured and the query box, Search button, and options dropdown remain disabled until the work completes or is canceled. Cancel remains enabled. Cached session documents contain raw conversation text and remain reusable across option combinations.
 
 Regular expressions are compiled once per search rather than added to the document cache. Invalid expressions are rejected before session loading begins. Matching uses cancellation checks and a finite timeout; expressions that take too long stop the search with an actionable error. Zero-length regular-expression matches are ignored because there is no text span to show or highlight.
 

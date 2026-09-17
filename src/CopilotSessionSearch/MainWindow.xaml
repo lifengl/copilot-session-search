@@ -112,12 +112,13 @@
           <TextBox x:Name="SearchTextBox"
                    AutomationProperties.HelpText="Type a pull request ID, bug ID, or words from an earlier Copilot conversation"
                    AutomationProperties.Name="Search conversation history"
-                   MinHeight="30"
                    Padding="8,4"
+                   ToolTip="Search conversation history (Ctrl+F)"
+                   IsEnabled="{Binding AreSearchInputsEnabled}"
+                   MinHeight="30"
                    PreviewKeyDown="SearchTextBox_PreviewKeyDown"
                    TabIndex="0"
-                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                   ToolTip="Search conversation history (Ctrl+F)" />
+                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
           <TextBlock Foreground="{Binding Foreground, ElementName=SearchTextBox}"
                      IsHitTestVisible="False"
                      Margin="9,0,9,0"
@@ -150,6 +151,15 @@
                   TabIndex="1"
                   ToolTip="Search (Enter or Alt+S)">
             <StackPanel Orientation="Horizontal">
+              <StackPanel.Style>
+                <Style TargetType="{x:Type StackPanel}">
+                  <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                      <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                    </Trigger>
+                  </Style.Triggers>
+                </Style>
+              </StackPanel.Style>
               <TextBlock FontFamily="Segoe Fluent Icons"
                          FontSize="14"
                          IsHitTestVisible="False"
@@ -165,7 +175,7 @@
                   AutomationProperties.HelpText="Choose regular-expression, whole-word, and case-sensitive matching"
                   AutomationProperties.Name="Search options"
                   Click="SearchOptionsButton_Click"
-                  IsEnabled="{Binding AreSearchOptionsEnabled}"
+                  IsEnabled="{Binding AreSearchInputsEnabled}"
                   Margin="1,0,0,0"
                   MinWidth="30"
                   Padding="4"
