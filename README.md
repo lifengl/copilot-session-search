@@ -10,6 +10,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Keeps results ordered by last activity, newest first.
 - Shows up to three excerpts for each session in the main window.
 - Opens modeless detail windows containing every matching message rendered as Markdown.
+- Lets each detail window switch between matching messages and the complete cached conversation.
 - Supports selecting and copying rendered text, plus a one-click copy of each full message.
 - Makes session metadata and the shell-ready resume command directly selectable.
 - Cancels an active search without removing results that have already been found.
@@ -45,7 +46,7 @@ dotnet test CopilotSessionSearch.sln
 
 The application takes a snapshot of the available session list when the first search starts. It does not subscribe to session lifecycle updates, so sessions created or modified afterward appear after restarting the application.
 
-Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window groups matching sections by conversation message and shows every matching message.
+Session histories are loaded on demand and cached in memory. Later searches reuse the cached visible messages. The main list contains no session-count limit, but each session item shows at most three excerpts. The detail window starts with every matching conversation message and can switch to the complete cached conversation without reading the session again.
 
 Detail messages are rendered through `MdXaml` as selectable WPF `FlowDocument` content. Headings, tables, lists, links, inline code, and fenced code blocks receive Markdown formatting. Select text and press Ctrl+C or use the document context menu. The clipboard retains WPF's plain-text, RTF, and XAML formats and adds HTML, allowing applications such as Word to preserve headings, emphasis, links, lists, inline code, and table structure. Plain-text consumers keep the existing copy behavior.
 
@@ -105,7 +106,7 @@ The bottom status bar keeps secondary information out of the primary search row.
 - The total number of matched sessions.
 - A compact icon-only theme button. Its menu shows monitor **System**, sun **Light**, and crescent **Dark** choices with text and checkmarks.
 
-The detail window has its own narrow status bar for keyboard guidance and transient copy confirmations, keeping instructions out of the session metadata.
+The detail window has its own narrow status bar for keyboard guidance and transient copy confirmations, keeping instructions out of the session metadata. Its compact view button switches that window between matching messages and the whole conversation; the choice is not persisted.
 
 ## Application icon
 

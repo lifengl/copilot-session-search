@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using System.Xml;
 using CopilotSessionSearch.Controls;
 using CopilotSessionSearch.ViewModels;
@@ -14,12 +15,17 @@ namespace CopilotSessionSearch.Views;
 
 public partial class SessionDetailsWindow : Window
 {
+    private readonly SessionDetailsViewModel _viewModel;
+
     public SessionDetailsWindow(SessionDetailsViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
 
         InitializeComponent();
+        _viewModel = viewModel;
         DataContext = viewModel;
+        _viewModel.MessageViewChanged += OnMessageViewChanged;
+        Closed += OnClosed;
         Loaded += OnLoaded;
     }
 
@@ -93,12 +99,44 @@ public partial class SessionDetailsWindow : Window
             preferSelection: false);
     }
 
+    private void MessageViewMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageViewMenuButton.ContextMenu is not ContextMenu contextMenu)
+        {
+            return;
+        }
+
+        contextMenu.PlacementTarget = MessageViewMenuButton;
+        contextMenu.IsOpen = true;
+    }
+
+    private void OnMessageViewChanged()
+    {
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(BringSelectedMessageIntoView));
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        _viewModel.MessageViewChanged -= OnMessageViewChanged;
+    }
+
+    private void BringSelectedMessageIntoView()
+    {
+        if (_viewModel.SelectedMessage is null)
+        {
+            return;
+        }
+
+        MessagesListView.ScrollIntoView(_viewModel.SelectedMessage);
+        MessagesListView.UpdateLayout();
+    }
+
     private void CopyRenderedContent(
         SelectableMarkdownViewer? viewer,
         bool preferSelection)
     {
-        var viewModel = (SessionDetailsViewModel)DataContext;
-
         try
         {
             bool copiedSelection =
@@ -108,14 +146,14 @@ public partial class SessionDetailsWindow : Window
 
             if (!copied)
             {
-                viewModel.ErrorMessage =
+                _viewModel.ErrorMessage =
                     "Unable to copy the message because its rendered content is unavailable.";
-                viewModel.StatusMessage = null;
+                _viewModel.StatusMessage = null;
                 return;
             }
 
-            viewModel.ErrorMessage = null;
-            viewModel.StatusMessage = copiedSelection
+            _viewModel.ErrorMessage = null;
+            _viewModel.StatusMessage = copiedSelection
                 ? "The selected text was copied with rich formatting."
                 : "The whole message was copied with rich formatting.";
         }
@@ -125,8 +163,8 @@ public partial class SessionDetailsWindow : Window
             or InvalidOperationException
             or XmlException)
         {
-            viewModel.ErrorMessage = $"Unable to copy the message: {ex.Message}";
-            viewModel.StatusMessage = null;
+            _viewModel.ErrorMessage = $"Unable to copy the message: {ex.Message}";
+            _viewModel.StatusMessage = null;
         }
     }
 

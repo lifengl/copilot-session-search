@@ -14,6 +14,8 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
 {
     private readonly IConsoleLauncher _consoleLauncher;
     private readonly IClipboardService _clipboardService;
+    private readonly IReadOnlyList<SessionDetailMessageViewModel> _allMessages;
+    private readonly IReadOnlyList<SessionDetailMessageViewModel> _matchingMessages;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -24,6 +26,14 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
 
     [ObservableProperty]
     private SessionDetailMessageViewModel? _selectedMessage;
+
+    [ObservableProperty]
+    private IReadOnlyList<SessionDetailMessageViewModel> _messages = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShowingMatchingMessages))]
+    [NotifyPropertyChangedFor(nameof(MessageViewMenuText))]
+    private bool _isShowingWholeConversation;
 
     public SessionDetailsViewModel(
         SessionSearchResult result,
@@ -37,17 +47,31 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         Result = result;
         _consoleLauncher = consoleLauncher;
         _clipboardService = clipboardService;
-        Messages = result.Sections
+        Dictionary<string, int> occurrenceCounts = result.Sections
             .GroupBy(section => section.EntryId, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(section => section.OccurrenceCount),
+                StringComparer.Ordinal);
+        _allMessages = result.Document.Entries
             .Select(
-                group => new SessionDetailMessageViewModel(
-                    group.ToArray(),
+                (entry, index) => new SessionDetailMessageViewModel(
+                    entry,
+                    index + 1,
                     result.Query,
-                    result.Options))
-            .OrderBy(message => message.MessageNumber)
+                    result.Options,
+                    occurrenceCounts.TryGetValue(entry.EventId, out int count)
+                        ? count
+                        : 0))
             .ToArray();
+        _matchingMessages = _allMessages
+            .Where(message => message.IsMatch)
+            .ToArray();
+        Messages = _matchingMessages;
         SelectedMessage = Messages.FirstOrDefault();
     }
+
+    public event Action? MessageViewChanged;
 
     public SessionSearchResult Result { get; }
 
@@ -104,7 +128,23 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     public string StatusBarText => StatusMessage
         ?? "Up/Down navigate | Page Up/Down scroll | Enter focus text | Esc close | Ctrl+C copy";
 
-    public IReadOnlyList<SessionDetailMessageViewModel> Messages { get; }
+    public bool IsShowingMatchingMessages => !IsShowingWholeConversation;
+
+    public string MessageViewMenuText => IsShowingWholeConversation
+        ? "View: Whole conversation"
+        : "View: Matching messages";
+
+    [RelayCommand]
+    private void ShowMatchingMessages()
+    {
+        SetMessageView(showWholeConversation: false);
+    }
+
+    [RelayCommand]
+    private void ShowWholeConversation()
+    {
+        SetMessageView(showWholeConversation: true);
+    }
 
     [RelayCommand]
     private void Resume()
@@ -140,6 +180,51 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
             ErrorMessage = $"Unable to copy session information: {ex.Message}";
             StatusMessage = null;
         }
+    }
+
+    private void SetMessageView(bool showWholeConversation)
+    {
+        if (IsShowingWholeConversation == showWholeConversation)
+        {
+            return;
+        }
+
+        SessionDetailMessageViewModel? previousSelection = SelectedMessage;
+        int? previousMessageNumber = previousSelection?.MessageNumber;
+
+        Messages = showWholeConversation
+            ? _allMessages
+            : _matchingMessages;
+        IsShowingWholeConversation = showWholeConversation;
+        SelectedMessage =
+            previousSelection is not null && Messages.Contains(previousSelection)
+                ? previousSelection
+                : FindNearestMessage(previousMessageNumber);
+        MessageViewChanged?.Invoke();
+    }
+
+    private SessionDetailMessageViewModel? FindNearestMessage(
+        int? messageNumber)
+    {
+        if (Messages.Count == 0)
+        {
+            return null;
+        }
+
+        if (messageNumber is null)
+        {
+            return Messages[0];
+        }
+
+        return Messages
+            .OrderBy(
+                message => Math.Abs(
+                    (long)message.MessageNumber - messageNumber.Value))
+            .ThenBy(
+                message => message.MessageNumber > messageNumber.Value
+                    ? 1
+                    : 0)
+            .First();
     }
 
     private string CreateSessionInfoText()

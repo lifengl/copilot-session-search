@@ -75,16 +75,70 @@ public sealed class SessionDetailsViewModelTests
         Assert.Null(viewModel.ErrorMessage);
     }
 
+    [Fact]
+    public void ConversationViewsPreserveSelectionOrChooseNearestMatch()
+    {
+        SessionDescriptor descriptor = CreateDescriptor();
+        ConversationEntry[] entries = Enumerable.Range(1, 5)
+            .Select(
+                messageNumber => new ConversationEntry(
+                    $"event-{messageNumber}",
+                    messageNumber % 2 == 0
+                        ? ConversationSpeaker.User
+                        : ConversationSpeaker.Copilot,
+                    descriptor.StartTime.AddMinutes(messageNumber),
+                    $"Message {messageNumber} content."))
+            .ToArray();
+        MatchSection[] sections =
+        [
+            CreateSection(entries[1], messageNumber: 2),
+            CreateSection(entries[4], messageNumber: 5),
+        ];
+        var result = new SessionSearchResult(
+            new SessionDocument(descriptor, entries),
+            "content",
+            sections,
+            matchCount: 2);
+        var viewModel = new SessionDetailsViewModel(
+            result,
+            new NoOpConsoleLauncher(),
+            new RecordingClipboardService());
+        int viewChangeCount = 0;
+        viewModel.MessageViewChanged += () => viewChangeCount++;
+
+        Assert.True(viewModel.IsShowingMatchingMessages);
+        Assert.False(viewModel.IsShowingWholeConversation);
+        Assert.Equal("View: Matching messages", viewModel.MessageViewMenuText);
+        Assert.Equal([2, 5], viewModel.Messages.Select(message => message.MessageNumber));
+
+        SessionDetailMessageViewModel matchingMessage = viewModel.Messages[1];
+        viewModel.SelectedMessage = matchingMessage;
+        viewModel.ShowWholeConversationCommand.Execute(null);
+
+        Assert.True(viewModel.IsShowingWholeConversation);
+        Assert.Equal("View: Whole conversation", viewModel.MessageViewMenuText);
+        Assert.Equal(5, viewModel.Messages.Count);
+        Assert.Equal(0, viewModel.Messages[0].OccurrenceCount);
+        Assert.Same(matchingMessage, viewModel.SelectedMessage);
+
+        viewModel.SelectedMessage = viewModel.Messages[3];
+        viewModel.ShowMatchingMessagesCommand.Execute(null);
+
+        Assert.True(viewModel.IsShowingMatchingMessages);
+        Assert.Equal([2, 5], viewModel.Messages.Select(message => message.MessageNumber));
+        Assert.Equal(5, viewModel.SelectedMessage?.MessageNumber);
+
+        viewModel.ShowWholeConversationCommand.Execute(null);
+        viewModel.SelectedMessage = viewModel.Messages[2];
+        viewModel.ShowMatchingMessagesCommand.Execute(null);
+
+        Assert.Equal(2, viewModel.SelectedMessage?.MessageNumber);
+        Assert.Equal(4, viewChangeCount);
+    }
+
     private static SessionSearchResult CreateResult(IReadOnlyList<MatchSection> sections)
     {
-        var descriptor = new SessionDescriptor(
-            "session-id",
-            "Session name",
-            DateTimeOffset.Parse("2026-09-01T10:00:00Z"),
-            DateTimeOffset.Parse("2026-09-01T11:00:00Z"),
-            @"Q:\ws\project",
-            "owner/repository",
-            "main");
+        SessionDescriptor descriptor = CreateDescriptor();
         var document = new SessionDocument(
             descriptor,
             [
@@ -105,6 +159,34 @@ public sealed class SessionDetailsViewModelTests
             "needle",
             sections,
             sections.Sum(section => section.OccurrenceCount));
+    }
+
+    private static SessionDescriptor CreateDescriptor()
+    {
+        return new SessionDescriptor(
+            "session-id",
+            "Session name",
+            DateTimeOffset.Parse("2026-09-01T10:00:00Z"),
+            DateTimeOffset.Parse("2026-09-01T11:00:00Z"),
+            @"Q:\ws\project",
+            "owner/repository",
+            "main");
+    }
+
+    private static MatchSection CreateSection(
+        ConversationEntry entry,
+        int messageNumber)
+    {
+        return new MatchSection(
+            entry.EventId,
+            messageNumber,
+            entry.Speaker,
+            entry.Timestamp,
+            entry.Content,
+            entry.Content,
+            entry.Content,
+            OccurrenceCount: 1,
+            HasAdditionalText: false);
     }
 
     private sealed class RecordingClipboardService : IClipboardService

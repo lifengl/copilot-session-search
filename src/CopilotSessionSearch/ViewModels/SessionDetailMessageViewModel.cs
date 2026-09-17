@@ -7,30 +7,38 @@ namespace CopilotSessionSearch.ViewModels;
 public sealed class SessionDetailMessageViewModel
 {
     public SessionDetailMessageViewModel(
-        IReadOnlyList<MatchSection> sections,
+        ConversationEntry entry,
+        int messageNumber,
         string query,
-        SessionSearchOptions options)
+        SessionSearchOptions options,
+        int occurrenceCount)
     {
-        ArgumentNullException.ThrowIfNull(sections);
+        ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (sections.Count == 0)
+        if (messageNumber <= 0)
         {
-            throw new ArgumentException(
-                "At least one matching section is required.",
-                nameof(sections));
+            throw new ArgumentOutOfRangeException(
+                nameof(messageNumber),
+                "Message number must be greater than zero.");
         }
 
-        MatchSection firstSection = sections[0];
-        EntryId = firstSection.EntryId;
-        MessageNumber = firstSection.MessageNumber;
-        Speaker = firstSection.Speaker;
-        Timestamp = firstSection.Timestamp;
-        MarkdownText = firstSection.FullText;
+        if (occurrenceCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(occurrenceCount),
+                "Occurrence count cannot be negative.");
+        }
+
+        EntryId = entry.EventId;
+        MessageNumber = messageNumber;
+        Speaker = entry.Speaker;
+        Timestamp = entry.Timestamp;
+        MarkdownText = entry.Content;
         Query = query;
         Options = options;
-        OccurrenceCount = sections.Sum(section => section.OccurrenceCount);
+        OccurrenceCount = occurrenceCount;
     }
 
     public string EntryId { get; }
@@ -54,6 +62,8 @@ public sealed class SessionDetailMessageViewModel
     public bool UseRegularExpression => Options.UseRegularExpression;
 
     public int OccurrenceCount { get; }
+
+    public bool IsMatch => OccurrenceCount > 0;
 
     public string SpeakerText => Speaker == ConversationSpeaker.User
         ? "You"
