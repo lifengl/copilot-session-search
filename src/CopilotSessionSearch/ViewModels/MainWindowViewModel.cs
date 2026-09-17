@@ -2,6 +2,7 @@
 
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopilotSessionSearch.Models;
@@ -58,6 +59,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     [ObservableProperty]
     private bool _isCaseSensitive;
+
+    [ObservableProperty]
+    private bool _useRegularExpression;
 
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
@@ -151,9 +155,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private Task SearchAsync()
     {
         var options = new SessionSearchOptions(
-            MatchWholeWord,
-            IsCaseSensitive);
-        _activeSearchTask = RunSearchAsync(SearchText.Trim(), options);
+            MatchWholeWord: MatchWholeWord,
+            IsCaseSensitive: IsCaseSensitive,
+            UseRegularExpression: UseRegularExpression);
+
+        TextSearchPattern pattern;
+        try
+        {
+            pattern = TextSearchPattern.Create(SearchText, options);
+        }
+        catch (ArgumentException ex) when (options.UseRegularExpression)
+        {
+            ErrorMessage = $"Invalid regular expression: {ex.Message}";
+            StatusText = "Enter a valid regular expression.";
+            return Task.CompletedTask;
+        }
+
+        _activeSearchTask = RunSearchAsync(pattern);
         return _activeSearchTask;
     }
 
@@ -210,9 +228,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         await _historySource.DisposeAsync().ConfigureAwait(false);
     }
 
-    private async Task RunSearchAsync(
-        string query,
-        SessionSearchOptions options)
+    private async Task RunSearchAsync(TextSearchPattern pattern)
     {
         using var cancellationSource = new CancellationTokenSource();
         _searchCancellationSource = cancellationSource;
@@ -227,8 +243,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         try
         {
             await foreach (SessionSearchUpdate update in _searchCoordinator.SearchAsync(
-                query,
-                options,
+                pattern,
                 cancellationSource.Token))
             {
                 _latestProgress = update.Progress;
@@ -258,6 +273,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             StatusText =
                 $"Search canceled after {_latestProgress.CompletedSessions:N0} of " +
                 $"{_latestProgress.TotalSessions:N0} sessions.";
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            ErrorMessage =
+                "The regular expression took too long to evaluate. " +
+                "Simplify it and try again.";
+            StatusText = "The regular-expression search timed out.";
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

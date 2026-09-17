@@ -216,6 +216,50 @@ public sealed class SelectableMarkdownViewerTests
             });
     }
 
+    [Fact]
+    public void ViewerHighlightsCaseInsensitiveRegularExpressionMatches()
+    {
+        RunOnSta(
+            () =>
+            {
+                var viewer = new SelectableMarkdownViewer
+                {
+                    HighlightText = "hot ?reload",
+                    SourceMarkdown = "HotReload and hot reload.",
+                    UseRegularExpression = true,
+                };
+                FlowDocument document = Assert.IsType<FlowDocument>(viewer.Document);
+                IReadOnlyList<Run> runs = EnumerateRuns(document).ToArray();
+                Run hotReload = Assert.Single(
+                    runs,
+                    candidate => candidate.Text == "HotReload");
+                Run hotReloadWithSpace = Assert.Single(
+                    runs,
+                    candidate => candidate.Text == "hot reload");
+
+                AssertHighlighted(hotReload, "HotReload");
+                AssertHighlighted(hotReloadWithSpace, "hot reload");
+            });
+    }
+
+    private static void AssertHighlighted(Run run, string text)
+    {
+        int matchStart = run.Text.IndexOf(text, StringComparison.Ordinal);
+        TextPointer? highlightPosition = run.ContentStart.GetPositionAtOffset(
+            matchStart + 1,
+            LogicalDirection.Forward);
+        TextPointer? highlightEnd = highlightPosition?.GetPositionAtOffset(
+            1,
+            LogicalDirection.Forward);
+
+        Assert.NotNull(highlightPosition);
+        Assert.NotNull(highlightEnd);
+        Assert.Equal(
+            SystemColors.HighlightBrush,
+            new TextRange(highlightPosition, highlightEnd).GetPropertyValue(
+                TextElement.BackgroundProperty));
+    }
+
     private static IEnumerable<Run> EnumerateRuns(DependencyObject parent)
     {
         return EnumerateElements<Run>(parent);

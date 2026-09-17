@@ -36,7 +36,8 @@ public sealed class SessionSearchServiceTests
                 "Needle needle needles."));
         var options = new SessionSearchOptions(
             MatchWholeWord: true,
-            IsCaseSensitive: true);
+            IsCaseSensitive: true,
+            UseRegularExpression: false);
 
         SessionSearchResult? result = _searchService.Search(
             document,
@@ -47,6 +48,32 @@ public sealed class SessionSearchServiceTests
         Assert.NotNull(result);
         Assert.Equal(options, result.Options);
         Assert.Equal(1, result.MatchCount);
+    }
+
+    [Fact]
+    public void SearchSupportsCaseInsensitiveRegularExpressions()
+    {
+        SessionDocument document = CreateDocument(
+            new ConversationEntry(
+                "user",
+                ConversationSpeaker.User,
+                DateTimeOffset.Parse("2026-09-01"),
+                "We discussed HotReload and hot reload."));
+        var options = new SessionSearchOptions(
+            MatchWholeWord: false,
+            IsCaseSensitive: false,
+            UseRegularExpression: true);
+
+        SessionSearchResult? result = _searchService.Search(
+            document,
+            "hot ?reload",
+            options,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result.MatchCount);
+        Assert.Equal(options, result.Options);
+        Assert.Contains("HotReload", result.Sections[0].PreviewText, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -51,6 +51,8 @@ public sealed class SessionDetailMessageViewModel
 
     public bool IsCaseSensitive => Options.IsCaseSensitive;
 
+    public bool UseRegularExpression => Options.UseRegularExpression;
+
     public int OccurrenceCount { get; }
 
     public string SpeakerText => Speaker == ConversationSpeaker.User

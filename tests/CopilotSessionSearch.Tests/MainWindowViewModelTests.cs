@@ -38,6 +38,7 @@ public sealed class MainWindowViewModelTests
             IsCaseSensitive = true,
             MatchWholeWord = true,
             SearchText = "needle",
+            UseRegularExpression = true,
         };
 
         Assert.Equal(AppThemePreference.System, viewModel.SelectedThemeOption.Preference);
@@ -50,6 +51,7 @@ public sealed class MainWindowViewModelTests
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
         viewModel.IsCaseSensitive = false;
         viewModel.MatchWholeWord = false;
+        viewModel.UseRegularExpression = false;
         await WaitUntilAsync(() => viewModel.Results.Count > 0, TimeSpan.FromSeconds(2));
 
         Assert.True(viewModel.IsSearching);
@@ -76,10 +78,43 @@ public sealed class MainWindowViewModelTests
             {
                 Assert.True(result.Result.Options.IsCaseSensitive);
                 Assert.True(result.Result.Options.MatchWholeWord);
+                Assert.True(result.Result.Options.UseRegularExpression);
             });
         Assert.Equal(
             [newest.SessionId, middle.SessionId, oldest.SessionId],
             viewModel.Results.Select(result => result.Result.Session.SessionId));
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task InvalidRegularExpressionIsRejectedBeforeSessionsAreLoaded()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var viewModel = new MainWindowViewModel(
+            new SessionSearchCoordinator(
+                historySource,
+                new SessionDocumentCache(),
+                new SessionSearchService()),
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore())
+        {
+            SearchText = "[",
+            UseRegularExpression = true,
+        };
+
+        await viewModel.SearchCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsSearching);
+        Assert.Equal(0, historySource.GetSessionsCallCount);
+        Assert.Contains(
+            "Invalid regular expression",
+            viewModel.ErrorMessage,
+            StringComparison.Ordinal);
+        Assert.Equal("Enter a valid regular expression.", viewModel.StatusText);
 
         await viewModel.DisposeAsync();
     }
@@ -125,10 +160,13 @@ public sealed class MainWindowViewModelTests
             _delays = delays;
         }
 
+        public int GetSessionsCallCount { get; private set; }
+
         public Task<IReadOnlyList<SessionDescriptor>> GetSessionsAsync(
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            GetSessionsCallCount++;
             return Task.FromResult(_sessions);
         }
 

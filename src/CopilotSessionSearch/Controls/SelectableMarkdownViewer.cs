@@ -47,6 +47,12 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         typeof(SelectableMarkdownViewer),
         new FrameworkPropertyMetadata(false, OnMarkdownPropertyChanged));
 
+    public static readonly DependencyProperty UseRegularExpressionProperty = DependencyProperty.Register(
+        nameof(UseRegularExpression),
+        typeof(bool),
+        typeof(SelectableMarkdownViewer),
+        new FrameworkPropertyMetadata(false, OnMarkdownPropertyChanged));
+
     public SelectableMarkdownViewer()
     {
         ClickAction = ClickAction.SafetyOpenBrowser;
@@ -76,6 +82,12 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
     {
         get => (bool)GetValue(IsCaseSensitiveProperty);
         set => SetValue(IsCaseSensitiveProperty, value);
+    }
+
+    public bool UseRegularExpression
+    {
+        get => (bool)GetValue(UseRegularExpressionProperty);
+        set => SetValue(UseRegularExpressionProperty, value);
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -307,12 +319,16 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
             var runs = new List<Run>();
             CollectElements(document, runs);
             var options = new SessionSearchOptions(
-                MatchWholeWord,
-                IsCaseSensitive);
+                MatchWholeWord: MatchWholeWord,
+                IsCaseSensitive: IsCaseSensitive,
+                UseRegularExpression: UseRegularExpression);
+            TextSearchPattern pattern = TextSearchPattern.Create(
+                highlightText,
+                options);
 
             foreach (Run run in runs)
             {
-                HighlightRun(run, highlightText, options);
+                HighlightRun(run, pattern);
             }
         }
     }
@@ -339,23 +355,19 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 
     private static void HighlightRun(
         Run run,
-        string highlightText,
-        SessionSearchOptions options)
+        TextSearchPattern pattern)
     {
         string text = run.Text;
-        IReadOnlyList<int> matchStarts = LiteralTextMatcher.FindMatches(
-            text,
-            highlightText,
-            options);
+        IReadOnlyList<TextMatch> matches = pattern.FindMatches(text);
 
-        for (int index = matchStarts.Count - 1; index >= 0; index--)
+        for (int index = matches.Count - 1; index >= 0; index--)
         {
-            int matchStart = matchStarts[index];
+            TextMatch match = matches[index];
             TextPointer? start = run.ContentStart.GetPositionAtOffset(
-                matchStart,
+                match.Start,
                 LogicalDirection.Forward);
             TextPointer? end = run.ContentStart.GetPositionAtOffset(
-                matchStart + highlightText.Length,
+                match.End,
                 LogicalDirection.Forward);
 
             if (start is not null && end is not null)

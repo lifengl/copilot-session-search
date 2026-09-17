@@ -35,6 +35,12 @@ public sealed class HighlightedTextBlock : TextBlock
         typeof(HighlightedTextBlock),
         new FrameworkPropertyMetadata(false, OnTextPropertyChanged));
 
+    public static readonly DependencyProperty UseRegularExpressionProperty = DependencyProperty.Register(
+        nameof(UseRegularExpression),
+        typeof(bool),
+        typeof(HighlightedTextBlock),
+        new FrameworkPropertyMetadata(false, OnTextPropertyChanged));
+
     public string SourceText
     {
         get => (string)GetValue(SourceTextProperty);
@@ -57,6 +63,12 @@ public sealed class HighlightedTextBlock : TextBlock
     {
         get => (bool)GetValue(IsCaseSensitiveProperty);
         set => SetValue(IsCaseSensitiveProperty, value);
+    }
+
+    public bool UseRegularExpression
+    {
+        get => (bool)GetValue(UseRegularExpressionProperty);
+        set => SetValue(UseRegularExpressionProperty, value);
     }
 
     private static void OnTextPropertyChanged(
@@ -84,29 +96,32 @@ public sealed class HighlightedTextBlock : TextBlock
             return;
         }
 
-        var options = new SessionSearchOptions(MatchWholeWord, IsCaseSensitive);
-        IReadOnlyList<int> matches = LiteralTextMatcher.FindMatches(
-            sourceText,
+        var options = new SessionSearchOptions(
+            MatchWholeWord: MatchWholeWord,
+            IsCaseSensitive: IsCaseSensitive,
+            UseRegularExpression: UseRegularExpression);
+        TextSearchPattern pattern = TextSearchPattern.Create(
             highlightText,
             options);
+        IReadOnlyList<TextMatch> matches = pattern.FindMatches(sourceText);
         int contentStart = 0;
 
-        foreach (int matchStart in matches)
+        foreach (TextMatch match in matches)
         {
-            if (matchStart > contentStart)
+            if (match.Start > contentStart)
             {
-                Inlines.Add(new Run(sourceText[contentStart..matchStart]));
+                Inlines.Add(new Run(sourceText[contentStart..match.Start]));
             }
 
             Inlines.Add(
-                new Run(sourceText.Substring(matchStart, highlightText.Length))
+                new Run(sourceText.Substring(match.Start, match.Length))
                 {
                     Background = SystemColors.HighlightBrush,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = SystemColors.HighlightTextBrush,
                 });
 
-            contentStart = matchStart + highlightText.Length;
+            contentStart = match.End;
         }
 
         if (contentStart < sourceText.Length)

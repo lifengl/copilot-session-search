@@ -4,9 +4,11 @@ namespace CopilotSessionSearch.Models;
 
 public sealed record SessionSearchOptions(
     bool MatchWholeWord,
-    bool IsCaseSensitive)
+    bool IsCaseSensitive,
+    bool UseRegularExpression)
 {
     public static SessionSearchOptions Default { get; } = new(
         MatchWholeWord: false,
-        IsCaseSensitive: false);
+        IsCaseSensitive: false,
+        UseRegularExpression: false);
 }

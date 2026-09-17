@@ -150,7 +150,13 @@ public partial class MainWindow : Window
 
     private void ShowDetails(SessionSearchResult result)
     {
-        string windowKey = result.Session.SessionId + "\0" + result.Query;
+        string windowKey = string.Join(
+            "\0",
+            result.Session.SessionId,
+            result.Query,
+            result.Options.MatchWholeWord,
+            result.Options.IsCaseSensitive,
+            result.Options.UseRegularExpression);
         if (_detailWindows.TryGetValue(windowKey, out SessionDetailsWindow? existingWindow))
         {
             existingWindow.Activate();

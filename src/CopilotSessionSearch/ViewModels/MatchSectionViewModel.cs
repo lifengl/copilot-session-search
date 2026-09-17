@@ -30,6 +30,8 @@ public sealed class MatchSectionViewModel
 
     public bool IsCaseSensitive => Options.IsCaseSensitive;
 
+    public bool UseRegularExpression => Options.UseRegularExpression;
+
     public string SpeakerText => Section.Speaker == ConversationSpeaker.User
         ? "You"
         : "Copilot";

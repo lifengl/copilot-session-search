@@ -4,7 +4,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 
 ## Features
 
-- Searches visible user and final Copilot messages using case-insensitive literal text matching.
+- Searches visible user and final Copilot messages using literal text or regular expressions.
 - Reads session metadata and persisted events through the public `GitHub.Copilot.SDK`.
 - Processes up to four sessions concurrently and adds matching sessions to the result list as they complete.
 - Keeps results ordered by last activity, newest first.
@@ -18,7 +18,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 - Shows an example watermark in the empty search field for first-time guidance.
-- Offers whole-word and case-sensitive literal search options from the Search dropdown.
+- Offers regular-expression, whole-word, and case-sensitive options from the Search dropdown.
 
 ## Requirements
 
@@ -84,14 +84,15 @@ Fenced code blocks use AvalonEdit. Light mode retains its language syntax highli
 
 ## Search options
 
-The dropdown beside Search contains two independent options:
+The dropdown beside Search contains three independent options:
 
-- **Match whole word** requires boundaries around queries that begin or end with a letter, digit, or underscore. This avoids matching short terms inside longer words or identifiers.
-- **Case sensitive** uses exact ordinal casing.
+- **Match whole word** requires boundaries around the actual text matched when it begins or ends with a letter, digit, or underscore. This works with literal and regular-expression searches and avoids matching short terms inside longer words or identifiers.
+- **Case sensitive** uses exact casing. When it is off, regular expressions use `RegexOptions.IgnoreCase` with culture-invariant matching, so patterns do not need constructs such as `[hH]`.
+- **Use regular expression** is separated as the final advanced option and interprets the search text as a .NET regular expression. For example, `hot ?reload` matches both `HotReload` and `hot reload` when **Case sensitive** is off.
 
 The selected options are captured when Search starts, so changing them never changes a search already in progress. Cached session documents contain raw conversation text and remain reusable across option combinations.
 
-Regular-expression search is intentionally not implemented yet. It remains a possible advanced mode, but would require validation, timeout/cancellation safeguards, and separate highlighting behavior.
+Regular expressions are compiled once per search rather than added to the document cache. Invalid expressions are rejected before session loading begins. Matching uses cancellation checks and a finite timeout; expressions that take too long stop the search with an actionable error. Zero-length regular-expression matches are ignored because there is no text span to show or highlight.
 
 ## Status bar
 

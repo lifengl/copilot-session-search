@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using CopilotSessionSearch.Models;
 
@@ -46,18 +47,27 @@ public sealed class SessionSearchCoordinator
         CancellationToken cancellationToken)
     {
         return SearchAsync(
-            query,
-            SessionSearchOptions.Default,
+            TextSearchPattern.Create(query, SessionSearchOptions.Default),
+            cancellationToken);
+    }
+
+    public IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+        string query,
+        SessionSearchOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        return SearchAsync(
+            TextSearchPattern.Create(query, options),
             cancellationToken);
     }
 
     public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
-        string query,
-        SessionSearchOptions options,
+        TextSearchPattern pattern,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(pattern);
 
         IReadOnlyList<SessionDescriptor> sessions = await _historySource
             .GetSessionsAsync(cancellationToken)
@@ -74,8 +84,7 @@ public sealed class SessionSearchCoordinator
         Task processingTask = Task.Run(
             () => ProcessSessionsAsync(
                 sessions,
-                query.Trim(),
-                options,
+                pattern,
                 updates.Writer,
                 cancellationToken),
             CancellationToken.None);
@@ -106,8 +115,7 @@ public sealed class SessionSearchCoordinator
 
     private async Task ProcessSessionsAsync(
         IReadOnlyList<SessionDescriptor> sessions,
-        string query,
-        SessionSearchOptions options,
+        TextSearchPattern pattern,
         ChannelWriter<SessionSearchUpdate> updateWriter,
         CancellationToken cancellationToken)
     {
@@ -147,11 +155,12 @@ public sealed class SessionSearchCoordinator
 
                         result = _searchService.Search(
                             document,
-                            query,
-                            options,
+                            pattern,
                             workerCancellationToken);
                     }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    catch (Exception ex) when (
+                        ex is not OperationCanceledException
+                        and not RegexMatchTimeoutException)
                     {
                         failure = new SessionSearchFailure(session, ex.Message);
                     }

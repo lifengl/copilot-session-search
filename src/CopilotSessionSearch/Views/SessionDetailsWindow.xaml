@@ -46,6 +46,7 @@
                                              MaxHeight="620"
                                              MinHeight="72"
                                              SourceMarkdown="{Binding MarkdownText, Mode=OneTime}"
+                                             UseRegularExpression="{Binding UseRegularExpression, Mode=OneTime}"
                                              VerticalScrollBarVisibility="Auto" />
         </Border>
       </Grid>

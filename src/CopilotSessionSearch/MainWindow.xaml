@@ -29,7 +29,8 @@
                                          MaxHeight="44"
                                          SourceText="{Binding PreviewText, Mode=OneTime}"
                                          TextTrimming="CharacterEllipsis"
-                                         TextWrapping="Wrap" />
+                                         TextWrapping="Wrap"
+                                         UseRegularExpression="{Binding UseRegularExpression, Mode=OneTime}" />
         </StackPanel>
       </Border>
     </DataTemplate>
@@ -161,7 +162,7 @@
           </Button>
           <Button x:Name="SearchOptionsButton"
                   Grid.Column="1"
-                  AutomationProperties.HelpText="Choose whole-word and case-sensitive matching"
+                  AutomationProperties.HelpText="Choose regular-expression, whole-word, and case-sensitive matching"
                   AutomationProperties.Name="Search options"
                   Click="SearchOptionsButton_Click"
                   IsEnabled="{Binding AreSearchOptionsEnabled}"
@@ -182,6 +183,12 @@
                           IsChecked="{Binding IsCaseSensitive, Mode=TwoWay}"
                           StaysOpenOnClick="True"
                           ToolTip="Match uppercase and lowercase exactly" />
+                <Separator />
+                <MenuItem Header="Use _regular expression"
+                          IsCheckable="True"
+                          IsChecked="{Binding UseRegularExpression, Mode=TwoWay}"
+                          StaysOpenOnClick="True"
+                          ToolTip="Interpret the search text as a .NET regular expression; leave Case sensitive unchecked to ignore casing" />
               </ContextMenu>
             </Button.ContextMenu>
             <TextBlock FontFamily="Segoe Fluent Icons"

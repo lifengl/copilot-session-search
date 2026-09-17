@@ -16,8 +16,7 @@ public sealed class SessionSearchService
     {
         return Search(
             document,
-            query,
-            SessionSearchOptions.Default,
+            TextSearchPattern.Create(query, SessionSearchOptions.Default),
             cancellationToken);
     }
 
@@ -27,11 +26,20 @@ public sealed class SessionSearchService
         SessionSearchOptions options,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(document);
-        ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        ArgumentNullException.ThrowIfNull(options);
+        return Search(
+            document,
+            TextSearchPattern.Create(query, options),
+            cancellationToken);
+    }
 
-        string normalizedQuery = query.Trim();
+    public SessionSearchResult? Search(
+        SessionDocument document,
+        TextSearchPattern pattern,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(pattern);
+
         var sections = new List<MatchSection>();
         int matchCount = 0;
 
@@ -40,10 +48,8 @@ public sealed class SessionSearchService
             cancellationToken.ThrowIfCancellationRequested();
 
             ConversationEntry entry = document.Entries[entryIndex];
-            IReadOnlyList<int> matches = LiteralTextMatcher.FindMatches(
+            IReadOnlyList<TextMatch> matches = pattern.FindMatches(
                 entry.Content,
-                normalizedQuery,
-                options,
                 cancellationToken);
             if (matches.Count == 0)
             {
@@ -51,14 +57,15 @@ public sealed class SessionSearchService
             }
 
             matchCount += matches.Count;
-            foreach (MatchRange range in CreateMatchRanges(entry.Content.Length, normalizedQuery.Length, matches))
+            foreach (MatchRange range in CreateMatchRanges(entry.Content.Length, matches))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                int previewStart = Math.Max(0, range.MatchStarts[0] - PreviewContextLength);
+                TextMatch firstMatch = range.Matches[0];
+                int previewStart = Math.Max(0, firstMatch.Start - PreviewContextLength);
                 int previewEnd = Math.Min(
                     entry.Content.Length,
-                    range.MatchStarts[0] + normalizedQuery.Length + PreviewContextLength);
+                    firstMatch.End + PreviewContextLength);
 
                 sections.Add(
                     new MatchSection(
@@ -69,7 +76,7 @@ public sealed class SessionSearchService
                         CreateExcerpt(entry.Content, previewStart, previewEnd),
                         CreateExcerpt(entry.Content, range.Start, range.End),
                         entry.Content,
-                        range.MatchStarts.Count,
+                        range.Matches.Count,
                         range.Start > 0 || range.End < entry.Content.Length));
             }
         }
@@ -78,33 +85,32 @@ public sealed class SessionSearchService
             ? null
             : new SessionSearchResult(
                 document,
-                normalizedQuery,
-                options,
+                pattern.Query,
+                pattern.Options,
                 sections,
                 matchCount);
     }
 
     private static IReadOnlyList<MatchRange> CreateMatchRanges(
         int contentLength,
-        int queryLength,
-        IReadOnlyList<int> matchStarts)
+        IReadOnlyList<TextMatch> matches)
     {
         var ranges = new List<MatchRange>();
 
-        foreach (int matchStart in matchStarts)
+        foreach (TextMatch match in matches)
         {
-            int rangeStart = Math.Max(0, matchStart - DetailContextLength);
-            int rangeEnd = Math.Min(contentLength, matchStart + queryLength + DetailContextLength);
+            int rangeStart = Math.Max(0, match.Start - DetailContextLength);
+            int rangeEnd = Math.Min(contentLength, match.End + DetailContextLength);
 
             if (ranges.Count > 0 && rangeStart <= ranges[^1].End)
             {
                 MatchRange previous = ranges[^1];
                 previous.End = Math.Max(previous.End, rangeEnd);
-                previous.MatchStarts.Add(matchStart);
+                previous.Matches.Add(match);
             }
             else
             {
-                ranges.Add(new MatchRange(rangeStart, rangeEnd, matchStart));
+                ranges.Add(new MatchRange(rangeStart, rangeEnd, match));
             }
         }
 
@@ -130,17 +136,17 @@ public sealed class SessionSearchService
 
     private sealed class MatchRange
     {
-        public MatchRange(int start, int end, int matchStart)
+        public MatchRange(int start, int end, TextMatch match)
         {
             Start = start;
             End = end;
-            MatchStarts = [matchStart];
+            Matches = [match];
         }
 
         public int Start { get; }
 
         public int End { get; set; }
 
-        public List<int> MatchStarts { get; }
+        public List<TextMatch> Matches { get; }
     }
 }

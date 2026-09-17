@@ -21,6 +21,7 @@ public sealed class HighlightedTextBlockTests
                     IsCaseSensitive = true,
                     MatchWholeWord = true,
                     SourceText = "cat category CAT cat_cat",
+                    UseRegularExpression = false,
                 };
 
                 IReadOnlyList<Run> highlightedRuns = textBlock.Inlines
@@ -30,6 +31,31 @@ public sealed class HighlightedTextBlockTests
 
                 Run highlightedRun = Assert.Single(highlightedRuns);
                 Assert.Equal("cat", highlightedRun.Text);
+            });
+    }
+
+    [Fact]
+    public void RegularExpressionHighlightingUsesActualMatchLengthsAndIgnoresCase()
+    {
+        RunOnSta(
+            () =>
+            {
+                var textBlock = new HighlightedTextBlock
+                {
+                    HighlightText = "hot ?reload",
+                    IsCaseSensitive = false,
+                    MatchWholeWord = false,
+                    SourceText = "HotReload and hot reload.",
+                    UseRegularExpression = true,
+                };
+
+                IReadOnlyList<string> highlightedText = textBlock.Inlines
+                    .OfType<Run>()
+                    .Where(run => Equals(run.Background, SystemColors.HighlightBrush))
+                    .Select(run => run.Text)
+                    .ToArray();
+
+                Assert.Equal(["HotReload", "hot reload"], highlightedText);
             });
     }
 
