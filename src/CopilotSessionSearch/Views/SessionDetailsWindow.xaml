@@ -96,10 +96,21 @@
                                              IsToolBarVisible="False"
                                              MatchWholeWord="{Binding MatchWholeWord, Mode=OneTime}"
                                              MaxHeight="620"
-                                             MinHeight="72"
                                              SourceMarkdown="{Binding MarkdownText, Mode=OneTime}"
                                              UseRegularExpression="{Binding UseRegularExpression, Mode=OneTime}"
-                                             VerticalScrollBarVisibility="Auto" />
+                                             VerticalScrollBarVisibility="Auto">
+            <controls:SelectableMarkdownViewer.Style>
+              <Style TargetType="{x:Type controls:SelectableMarkdownViewer}">
+                <Setter Property="MinHeight" Value="72" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                               Value="True">
+                    <Setter Property="MinHeight" Value="0" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </controls:SelectableMarkdownViewer.Style>
+          </controls:SelectableMarkdownViewer>
         </Border>
       </Grid>
     </DataTemplate>
