@@ -19,7 +19,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Supports 50%-200% per-window zoom in 10% steps with Ctrl+Plus, Ctrl+Minus, and Ctrl+0.
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
-- Shows an example watermark in the empty search field for first-time guidance.
+- Shows mode-specific guidance in the empty search field, including how to turn on AI search and what to enter when it is active.
 - Offers regular-expression, whole-word, and case-sensitive options from the Search dropdown.
 - Offers AI-assisted retrieval that locally prefilters history before sending bounded excerpts to Copilot for relevance ranking.
 

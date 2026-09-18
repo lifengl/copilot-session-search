@@ -144,9 +144,16 @@ public sealed class MainWindowViewModelTests
             UseRegularExpression = true,
         };
 
+        Assert.Equal(
+            "Search by PR, bug, or phrase, or turn on AI search for natural-language questions",
+            viewModel.SearchWatermarkText);
+
         viewModel.UseAiSearch = true;
         await aiCoordinator.PreparationStarted;
 
+        Assert.Equal(
+            "Describe the earlier conversation or investigation you want to find",
+            viewModel.SearchWatermarkText);
         Assert.True(viewModel.IsPreparingAiSearch);
         Assert.True(viewModel.IsBackgroundWorkActive);
         Assert.True(viewModel.AreSearchInputsEnabled);

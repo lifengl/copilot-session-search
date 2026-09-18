@@ -76,6 +76,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AreLiteralSearchOptionsEnabled))]
+    [NotifyPropertyChangedFor(nameof(SearchWatermarkText))]
     private bool _useAiSearch;
 
     public MainWindowViewModel(
@@ -136,6 +137,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public string MatchSummaryText => MatchingSessionCount == 1
         ? "1 matched session"
         : $"{MatchingSessionCount:N0} matched sessions";
+
+    public string SearchWatermarkText => UseAiSearch
+        ? "Describe the earlier conversation or investigation you want to find"
+        : "Search by PR, bug, or phrase, or turn on AI search for natural-language questions";
 
     public bool AreSearchInputsEnabled => !IsSearching;
 

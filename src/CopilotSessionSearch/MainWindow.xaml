@@ -201,7 +201,7 @@
                      IsHitTestVisible="False"
                      Margin="9,0,9,0"
                      Opacity="0.55"
-                     Text="Search conversations (for example, PR 123456, bug 789012, or a phrase)"
+                     Text="{Binding SearchWatermarkText}"
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center">
             <TextBlock.Style>
