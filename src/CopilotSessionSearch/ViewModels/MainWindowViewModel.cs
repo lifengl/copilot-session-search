@@ -35,7 +35,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private bool _isSearching;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     [NotifyPropertyChangedFor(nameof(IsBackgroundWorkActive))]
     private bool _isPreparingAiSearch;
 
@@ -235,20 +234,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     private bool CanCancel()
     {
-        return IsBackgroundWorkActive;
+        return IsSearching;
     }
 
     [RelayCommand(CanExecute = nameof(CanCancel))]
     private void Cancel()
     {
-        if (IsSearching)
-        {
-            _searchCancellationSource?.Cancel();
-        }
-        else
-        {
-            _aiPreparationCancellationSource?.Cancel();
-        }
+        _searchCancellationSource?.Cancel();
     }
 
     [RelayCommand]

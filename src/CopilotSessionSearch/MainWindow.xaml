@@ -313,7 +313,6 @@
         </Grid>
         <Button Grid.Column="2"
                 Command="{Binding CancelCommand}"
-                IsEnabled="{Binding IsBackgroundWorkActive}"
                 Margin="8,0,0,0"
                 MinWidth="88"
                 TabIndex="3"

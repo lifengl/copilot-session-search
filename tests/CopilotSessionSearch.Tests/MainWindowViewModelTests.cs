@@ -122,7 +122,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task AiOptionPreparesIndexWithoutDisablingQueryInput()
+    public async Task AiOptionPreparesIndexWithoutEnablingSearchCancel()
     {
         var historySource = new DelayedHistorySource(
             [],
@@ -158,16 +158,23 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsBackgroundWorkActive);
         Assert.True(viewModel.AreSearchInputsEnabled);
         Assert.False(viewModel.AreLiteralSearchOptionsEnabled);
-        Assert.True(viewModel.CancelCommand.CanExecute(null));
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
         Assert.True(viewModel.IsCaseSensitive);
         Assert.True(viewModel.MatchWholeWord);
         Assert.True(viewModel.UseRegularExpression);
 
         viewModel.CancelCommand.Execute(null);
+        await Task.Delay(50);
+
+        Assert.True(viewModel.IsPreparingAiSearch);
+        Assert.False(aiCoordinator.PreparationWasCanceled);
+
+        viewModel.UseAiSearch = false;
         await WaitUntilAsync(
             () => !viewModel.IsPreparingAiSearch,
             TimeSpan.FromSeconds(2));
 
+        Assert.True(aiCoordinator.PreparationWasCanceled);
         Assert.False(viewModel.IsBackgroundWorkActive);
         Assert.Contains(
             "canceled",
@@ -207,6 +214,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.IsSearching);
         Assert.True(viewModel.IsPreparingAiSearch);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
         Assert.False(aiCoordinator.PreparationWasCanceled);
 
         aiCoordinator.CompletePreparation();
@@ -216,6 +224,32 @@ public sealed class MainWindowViewModelTests
         Assert.True(aiCoordinator.IsReady);
 
         await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisposingViewModelCancelsAiIndexPreparation()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var aiCoordinator = new BlockingAiSearchCoordinator();
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            aiCoordinator);
+        var viewModel = new MainWindowViewModel(
+            coordinator,
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore());
+
+        viewModel.UseAiSearch = true;
+        await aiCoordinator.PreparationStarted;
+
+        await viewModel.DisposeAsync();
+
+        Assert.True(aiCoordinator.PreparationWasCanceled);
     }
 
     [Fact]
@@ -399,6 +433,8 @@ public sealed class MainWindowViewModelTests
 
         public Task PreparationStarted => _preparationStarted.Task;
 
+        public bool PreparationWasCanceled { get; private set; }
+
         public bool IsReady => false;
 
         public async Task<HybridIndexMetrics> PrepareAsync(
@@ -406,11 +442,19 @@ public sealed class MainWindowViewModelTests
             CancellationToken cancellationToken)
         {
             _preparationStarted.TrySetResult();
-            await Task.Delay(
-                Timeout.InfiniteTimeSpan,
-                cancellationToken);
-            throw new InvalidOperationException(
-                "The cancellation delay unexpectedly completed.");
+            try
+            {
+                await Task.Delay(
+                    Timeout.InfiniteTimeSpan,
+                    cancellationToken);
+                throw new InvalidOperationException(
+                    "The cancellation delay unexpectedly completed.");
+            }
+            finally
+            {
+                PreparationWasCanceled =
+                    cancellationToken.IsCancellationRequested;
+            }
         }
 
         public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
