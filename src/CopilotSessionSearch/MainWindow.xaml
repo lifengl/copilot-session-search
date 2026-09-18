@@ -12,6 +12,12 @@
         Width="1040"
         WindowStartupLocation="CenterScreen">
   <Window.Resources>
+    <SolidColorBrush x:Key="AiSearchGlyphBrush" Color="#CA5010" />
+    <SolidColorBrush x:Key="CaseSensitiveGlyphBrush" Color="#008272" />
+    <SolidColorBrush x:Key="RegularExpressionGlyphBrush" Color="#8764B8" />
+    <SolidColorBrush x:Key="StopGlyphBrush" Color="#D13438" />
+    <SolidColorBrush x:Key="WholeWordGlyphBrush" Color="#0078D4" />
+
     <DataTemplate x:Key="SampleTemplate">
       <Border BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
               BorderThickness="1"
@@ -102,6 +108,54 @@
       <Setter Property="Padding" Value="0" />
       <EventSetter Event="PreviewMouseLeftButtonUp" Handler="SearchResultItem_PreviewMouseLeftButtonUp" />
     </Style>
+
+    <Style x:Key="IconTextButtonContentStyle" TargetType="{x:Type StackPanel}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                     Value="False">
+          <Setter Property="Opacity" Value="0.45" />
+          <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SearchOptionGlyphStyle" TargetType="{x:Type controls:SearchOptionGlyph}">
+      <Setter Property="Height" Value="16" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="Width" Value="18" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+        </DataTrigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AiSearchOptionGlyphStyle"
+           BasedOn="{StaticResource SearchOptionGlyphStyle}"
+           TargetType="{x:Type controls:SearchOptionGlyph}">
+      <Setter Property="Foreground" Value="{StaticResource AiSearchGlyphBrush}" />
+    </Style>
+
+    <Style x:Key="CaseSensitiveOptionGlyphStyle"
+           BasedOn="{StaticResource SearchOptionGlyphStyle}"
+           TargetType="{x:Type controls:SearchOptionGlyph}">
+      <Setter Property="Foreground" Value="{StaticResource CaseSensitiveGlyphBrush}" />
+    </Style>
+
+    <Style x:Key="RegularExpressionOptionGlyphStyle"
+           BasedOn="{StaticResource SearchOptionGlyphStyle}"
+           TargetType="{x:Type controls:SearchOptionGlyph}">
+      <Setter Property="Foreground" Value="{StaticResource RegularExpressionGlyphBrush}" />
+    </Style>
+
+    <Style x:Key="WholeWordOptionGlyphStyle"
+           BasedOn="{StaticResource SearchOptionGlyphStyle}"
+           TargetType="{x:Type controls:SearchOptionGlyph}">
+      <Setter Property="Foreground" Value="{StaticResource WholeWordGlyphBrush}" />
+    </Style>
   </Window.Resources>
 
   <Window.InputBindings>
@@ -174,16 +228,8 @@
                   MinWidth="88"
                   TabIndex="1"
                   ToolTip="Search (Enter or Alt+S)">
-            <StackPanel Orientation="Horizontal">
-              <StackPanel.Style>
-                <Style TargetType="{x:Type StackPanel}">
-                  <Style.Triggers>
-                    <Trigger Property="IsEnabled" Value="False">
-                      <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
-                    </Trigger>
-                  </Style.Triggers>
-                </Style>
-              </StackPanel.Style>
+            <StackPanel Style="{StaticResource IconTextButtonContentStyle}"
+                        Orientation="Horizontal">
               <TextBlock FontFamily="Segoe Fluent Icons"
                          FontSize="14"
                          IsHitTestVisible="False"
@@ -212,26 +258,46 @@
                           IsChecked="{Binding MatchWholeWord, Mode=TwoWay}"
                           IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
-                          ToolTip="Letters, digits, and underscore count as word characters" />
+                          ToolTip="Letters, digits, and underscore count as word characters">
+                  <MenuItem.Icon>
+                    <controls:SearchOptionGlyph Kind="WholeWord"
+                                                Style="{StaticResource WholeWordOptionGlyphStyle}" />
+                  </MenuItem.Icon>
+                </MenuItem>
                 <MenuItem Header="_Case sensitive"
                           IsCheckable="True"
                           IsChecked="{Binding IsCaseSensitive, Mode=TwoWay}"
                           IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
-                          ToolTip="Match uppercase and lowercase exactly" />
+                          ToolTip="Match uppercase and lowercase exactly">
+                  <MenuItem.Icon>
+                    <controls:SearchOptionGlyph Kind="CaseSensitive"
+                                                Style="{StaticResource CaseSensitiveOptionGlyphStyle}" />
+                  </MenuItem.Icon>
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="Use _regular expression"
                           IsCheckable="True"
                           IsChecked="{Binding UseRegularExpression, Mode=TwoWay}"
                           IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
-                          ToolTip="Interpret the search text as a .NET regular expression; leave Case sensitive unchecked to ignore casing" />
+                          ToolTip="Interpret the search text as a .NET regular expression; leave Case sensitive unchecked to ignore casing">
+                  <MenuItem.Icon>
+                    <controls:SearchOptionGlyph Kind="RegularExpression"
+                                                Style="{StaticResource RegularExpressionOptionGlyphStyle}" />
+                  </MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Use _AI search (preview)"
+                <MenuItem Header="Use _AI search"
                           IsCheckable="True"
                           IsChecked="{Binding UseAiSearch, Mode=TwoWay}"
                           StaysOpenOnClick="True"
-                          ToolTip="Send the query and a bounded set of locally prefiltered excerpts to Copilot for relevance ranking" />
+                          ToolTip="Send the query and a bounded set of locally prefiltered excerpts to Copilot for relevance ranking">
+                  <MenuItem.Icon>
+                    <controls:SearchOptionGlyph Kind="AiSearch"
+                                                Style="{StaticResource AiSearchOptionGlyphStyle}" />
+                  </MenuItem.Icon>
+                </MenuItem>
               </ContextMenu>
             </Button.ContextMenu>
             <TextBlock FontFamily="Segoe Fluent Icons"
@@ -242,12 +308,37 @@
         </Grid>
         <Button Grid.Column="2"
                 Command="{Binding CancelCommand}"
-                Content="_Cancel"
                 IsEnabled="{Binding IsBackgroundWorkActive}"
                 Margin="8,0,0,0"
                 MinWidth="88"
                 TabIndex="3"
-                ToolTip="Cancel search (Escape or Alt+C)" />
+                ToolTip="Cancel search (Escape or Alt+C)">
+          <StackPanel Style="{StaticResource IconTextButtonContentStyle}"
+                      Orientation="Horizontal">
+            <Rectangle Height="9"
+                       IsHitTestVisible="False"
+                       VerticalAlignment="Center"
+                       Width="9">
+              <Rectangle.Style>
+                <Style TargetType="{x:Type Rectangle}">
+                  <Setter Property="Fill" Value="{StaticResource StopGlyphBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                      <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                                 Value="False">
+                      <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Rectangle.Style>
+            </Rectangle>
+            <AccessText Margin="5,0,0,0"
+                        Text="_Cancel"
+                        VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
       </Grid>
 
       <TextBlock Grid.Row="1"

@@ -21,7 +21,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 - Shows an example watermark in the empty search field for first-time guidance.
 - Offers regular-expression, whole-word, and case-sensitive options from the Search dropdown.
-- Offers preview AI-assisted retrieval that locally prefilters history before sending bounded excerpts to Copilot for relevance ranking.
+- Offers AI-assisted retrieval that locally prefilters history before sending bounded excerpts to Copilot for relevance ranking.
 
 ## Requirements
 
@@ -96,7 +96,7 @@ The dropdown beside Search contains four options:
 - **Match whole word** requires boundaries around the actual text matched when it begins or ends with a letter, digit, or underscore. This works with literal and regular-expression searches and avoids matching short terms inside longer words or identifiers.
 - **Case sensitive** uses exact casing. When it is off, regular expressions use `RegexOptions.IgnoreCase` with culture-invariant matching, so patterns do not need constructs such as `[hH]`.
 - **Use regular expression** is separated as the final advanced option and interprets the search text as a .NET regular expression. For example, `hot ?reload` matches both `HotReload` and `hot reload` when **Case sensitive** is off.
-- **Use AI search (preview)** searches a persistent local hybrid index and sends only a bounded set of prefiltered excerpts to Copilot for ranking. While selected, the whole-word, case-sensitive, and regular-expression options are disabled and ignored, but their values are retained for later literal searches.
+- **Use AI search** searches a persistent local hybrid index and sends only a bounded set of prefiltered excerpts to Copilot for ranking. While selected, the whole-word, case-sensitive, and regular-expression options are disabled and ignored, but their values are retained for later literal searches.
 
 The Search button is enabled when the window opens even if the query is empty, while keyboard focus starts in the query box. Activating Search with no text is a harmless no-op. Once a real search starts, the selected query and options are captured and the query box, Search button, and options dropdown remain disabled until the work completes or is canceled. Cancel remains enabled. Cached session documents contain raw conversation text and remain reusable across option combinations.
 
