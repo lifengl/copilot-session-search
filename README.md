@@ -12,7 +12,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Opens modeless detail windows containing every matching message rendered as Markdown.
 - Lets each detail window switch between matching messages and the complete cached conversation.
 - Supports selecting and copying rendered text, plus a one-click copy of each full message.
-- Makes session metadata and the shell-ready resume command directly selectable.
+- Makes session metadata and the shell-ready resume command directly selectable, with hover copy buttons for the session ID, working directory, and resume command.
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
 - Supports and persists System, Light, and Dark Fluent themes.

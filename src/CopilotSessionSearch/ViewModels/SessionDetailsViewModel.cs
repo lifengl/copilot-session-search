@@ -210,17 +210,43 @@ public sealed partial class SessionDetailsViewModel : ObservableObject, IDisposa
     [RelayCommand]
     private void CopySessionInfo()
     {
-        try
-        {
-            _clipboardService.SetText(CreateSessionInfoText());
-            ErrorMessage = null;
-            StatusMessage = "Session information was copied to the clipboard.";
-        }
-        catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
-        {
-            ErrorMessage = $"Unable to copy session information: {ex.Message}";
-            StatusMessage = null;
-        }
+        CopyText(
+            CreateSessionInfoText(),
+            "Session information was copied to the clipboard.",
+            "Unable to copy session information");
+    }
+
+    [RelayCommand]
+    private void CopySessionId()
+    {
+        CopyText(
+            SessionId,
+            "Session ID was copied to the clipboard.",
+            "Unable to copy the session ID");
+    }
+
+    private bool CanCopyWorkingDirectory()
+    {
+        return !string.IsNullOrWhiteSpace(
+            Result.Session.WorkingDirectory);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCopyWorkingDirectory))]
+    private void CopyWorkingDirectory()
+    {
+        CopyText(
+            Result.Session.WorkingDirectory!,
+            "Working directory was copied to the clipboard.",
+            "Unable to copy the working directory");
+    }
+
+    [RelayCommand]
+    private void CopyResume()
+    {
+        CopyText(
+            ResumeCommandText,
+            "Resume command was copied to the clipboard.",
+            "Unable to copy the resume command");
     }
 
     private void SetMessageView(bool showWholeConversation)
@@ -281,5 +307,25 @@ public sealed partial class SessionDetailsViewModel : ObservableObject, IDisposa
             $"Session span: {SessionSpanSummaryText}",
             $"Search: {SearchSummaryText}",
             $"Resume command: {ResumeCommandText}");
+    }
+
+    private void CopyText(
+        string text,
+        string successMessage,
+        string errorPrefix)
+    {
+        try
+        {
+            _clipboardService.SetText(text);
+            ErrorMessage = null;
+            StatusMessage = successMessage;
+        }
+        catch (Exception ex) when (
+            ex is ExternalException
+            or InvalidOperationException)
+        {
+            ErrorMessage = $"{errorPrefix}: {ex.Message}";
+            StatusMessage = null;
+        }
     }
 }

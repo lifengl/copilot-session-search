@@ -72,6 +72,28 @@ public sealed class SessionDetailsViewModelTests
             "Session information was copied to the clipboard.",
             viewModel.StatusBarText);
 
+        viewModel.CopySessionIdCommand.Execute(null);
+
+        Assert.Equal("session-id", clipboardService.Text);
+        Assert.Equal(
+            "Session ID was copied to the clipboard.",
+            viewModel.StatusBarText);
+
+        Assert.True(viewModel.CopyWorkingDirectoryCommand.CanExecute(null));
+        viewModel.CopyWorkingDirectoryCommand.Execute(null);
+
+        Assert.Equal(@"Q:\ws\project", clipboardService.Text);
+        Assert.Equal(
+            "Working directory was copied to the clipboard.",
+            viewModel.StatusBarText);
+
+        viewModel.CopyResumeCommand.Execute(null);
+
+        Assert.Equal("copilot --resume=session-id", clipboardService.Text);
+        Assert.Equal(
+            "Resume command was copied to the clipboard.",
+            viewModel.StatusBarText);
+
         Assert.Null(viewModel.ErrorMessage);
     }
 
