@@ -7,6 +7,7 @@
         MinHeight="480"
         MinWidth="720"
         PreviewKeyDown="MainWindow_PreviewKeyDown"
+        PreviewMouseDown="MainWindow_PreviewMouseDown"
         Title="Copilot Session Search"
         Width="1040"
         WindowStartupLocation="CenterScreen">
@@ -114,6 +115,10 @@
     </Grid.RowDefinitions>
 
     <Grid Margin="16,16,16,8">
+      <Grid.LayoutTransform>
+        <ScaleTransform ScaleX="{Binding Zoom.Scale}" ScaleY="{Binding Zoom.Scale}" />
+      </Grid.LayoutTransform>
+
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
@@ -295,6 +300,7 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
 
           <TextBlock AutomationProperties.LiveSetting="Polite"
@@ -321,16 +327,21 @@
                      Text="{Binding MatchSummaryText}"
                      VerticalAlignment="Center" />
 
+          <controls:ZoomStatusControl Grid.Column="3"
+                                      DataContext="{Binding Zoom}"
+                                      Margin="8,0,0,0"
+                                      TabIndex="5" />
+
           <Button x:Name="ThemeMenuButton"
-                  Grid.Column="3"
+                  Grid.Column="4"
                   AutomationProperties.HelpText="Switch between System, Light, and Dark themes"
                   AutomationProperties.Name="{Binding ThemeMenuText}"
                   Click="ThemeMenuButton_Click"
                   Margin="8,0,0,0"
-                  MinHeight="20"
+                  MinHeight="24"
                   MinWidth="26"
                   Padding="4,1"
-                  TabIndex="5"
+                  TabIndex="6"
                   ToolTip="{Binding ThemeMenuText}">
             <Button.ContextMenu>
               <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">

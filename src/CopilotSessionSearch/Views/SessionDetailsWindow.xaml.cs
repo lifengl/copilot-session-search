@@ -26,6 +26,7 @@ public partial class SessionDetailsWindow : Window
         DataContext = viewModel;
         _viewModel.MessageViewChanged += OnMessageViewChanged;
         Closed += OnClosed;
+        Deactivated += OnDeactivated;
         Loaded += OnLoaded;
     }
 
@@ -36,6 +37,23 @@ public partial class SessionDetailsWindow : Window
 
     private void SessionDetailsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape
+            && Keyboard.Modifiers == ModifierKeys.None
+            && _viewModel.Zoom.IsPopupOpen)
+        {
+            _viewModel.Zoom.IsPopupOpen = false;
+            e.Handled = true;
+            return;
+        }
+
+        if (_viewModel.Zoom.TryHandleShortcut(
+            e.Key,
+            Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Escape
             || Keyboard.Modifiers != ModifierKeys.None)
         {
@@ -44,6 +62,22 @@ public partial class SessionDetailsWindow : Window
 
         e.Handled = true;
         Close();
+    }
+
+    private void SessionDetailsWindow_PreviewMouseDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_viewModel.Zoom.IsPopupOpen
+            && !ZoomStatusControl.IsSourceWithinZoomControl(e.OriginalSource))
+        {
+            _viewModel.Zoom.ClosePopupCommand.Execute(null);
+        }
+    }
+
+    private void OnDeactivated(object? sender, EventArgs e)
+    {
+        _viewModel.Zoom.ClosePopupCommand.Execute(null);
     }
 
     private void MessagesListView_PreviewMouseLeftButtonDown(
@@ -109,6 +143,7 @@ public partial class SessionDetailsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.MessageViewChanged -= OnMessageViewChanged;
+        _viewModel.Dispose();
     }
 
     private void BringSelectedMessageIntoView()

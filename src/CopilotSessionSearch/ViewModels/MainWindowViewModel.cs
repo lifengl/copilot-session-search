@@ -112,6 +112,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     public ObservableCollection<SessionSearchResultViewModel> Results { get; } = [];
 
+    public WindowZoomViewModel Zoom { get; } = new();
+
     public IReadOnlyList<ThemeOption> ThemeOptions { get; }
 
     public ThemeOption SystemThemeOption { get; }
@@ -270,6 +272,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         }
 
         _disposed = true;
+        Zoom.Dispose();
         SearchCommand.NotifyCanExecuteChanged();
         _searchCancellationSource?.Cancel();
         _aiPreparationCancellationSource?.Cancel();

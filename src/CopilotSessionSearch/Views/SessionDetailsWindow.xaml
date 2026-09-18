@@ -7,6 +7,7 @@
         MinHeight="520"
         MinWidth="760"
         PreviewKeyDown="SessionDetailsWindow_PreviewKeyDown"
+        PreviewMouseDown="SessionDetailsWindow_PreviewMouseDown"
         Title="{Binding Name, StringFormat=Session - {0}}"
         Width="1080"
         WindowStartupLocation="CenterOwner">
@@ -175,6 +176,10 @@
     </Grid.RowDefinitions>
 
     <Grid Margin="16,16,16,8">
+      <Grid.LayoutTransform>
+        <ScaleTransform ScaleX="{Binding Zoom.Scale}" ScaleY="{Binding Zoom.Scale}" />
+      </Grid.LayoutTransform>
+
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
@@ -192,6 +197,7 @@
           </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
 
@@ -424,6 +430,7 @@
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
 
           <TextBlock AutomationProperties.LiveSetting="Polite"
@@ -432,15 +439,20 @@
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center" />
 
-          <Button Grid.Column="1"
+          <controls:ZoomStatusControl Grid.Column="1"
+                                      DataContext="{Binding Zoom}"
+                                      Margin="8,0,0,0"
+                                      TabIndex="5" />
+
+          <Button Grid.Column="2"
                   AutomationProperties.HelpText="Switch between matching messages and the whole conversation"
                   AutomationProperties.Name="{Binding MessageViewButtonText}"
                   Command="{Binding ToggleMessageViewCommand}"
                   Margin="8,0,0,0"
-                  MinHeight="20"
+                  MinHeight="24"
                   MinWidth="26"
                   Padding="4,1"
-                  TabIndex="5"
+                  TabIndex="6"
                   ToolTip="{Binding MessageViewButtonText}">
             <controls:ConversationViewGlyph Height="14"
                                             IsHitTestVisible="False"

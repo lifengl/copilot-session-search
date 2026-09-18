@@ -1,0 +1,55 @@
+﻿<UserControl x:Class="CopilotSessionSearch.Controls.ZoomStatusControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CopilotSessionSearch.ViewModels"
+             x:Name="Root"
+             Focusable="False"
+             IsTabStop="False">
+  <Grid>
+    <Button x:Name="ZoomButton"
+            AutomationProperties.HelpText="Change the active window zoom from 50% to 200%"
+            AutomationProperties.Name="{Binding AccessibleText}"
+            Click="ZoomButton_Click"
+            Content="{Binding PercentageText}"
+            Padding="4,1"
+            PreviewMouseLeftButtonDown="ZoomButton_PreviewMouseLeftButtonDown"
+            ToolTip="Zoom level (Ctrl+Plus, Ctrl+Minus, or Ctrl+0)"
+            MinHeight="24"
+            MinWidth="48"
+            TabIndex="{Binding TabIndex, ElementName=Root}" />
+
+    <Popup x:Name="ZoomPopup"
+           AllowsTransparency="True"
+           IsOpen="{Binding IsPopupOpen, Mode=TwoWay}"
+           Placement="Custom"
+           PlacementTarget="{Binding ElementName=ZoomButton}"
+           PopupAnimation="Fade"
+           StaysOpen="True">
+      <Border Background="{Binding PlacementTarget.Background, ElementName=ZoomPopup}"
+              BorderBrush="{Binding PlacementTarget.BorderBrush, ElementName=ZoomPopup}"
+              BorderThickness="1"
+              Padding="4,2">
+        <Slider AutomationProperties.Name="Zoom level"
+                Foreground="{Binding PlacementTarget.Foreground, ElementName=ZoomPopup}"
+                AutoToolTipPlacement="TopLeft"
+                AutoToolTipPrecision="0"
+                IsMoveToPointEnabled="True"
+                IsSnapToTickEnabled="True"
+                LargeChange="{x:Static viewModels:WindowZoomViewModel.SliderStepPercentage}"
+                Maximum="{x:Static viewModels:WindowZoomViewModel.MaximumSliderPercentage}"
+                Minimum="{x:Static viewModels:WindowZoomViewModel.MinimumSliderPercentage}"
+                SmallChange="{x:Static viewModels:WindowZoomViewModel.SliderStepPercentage}"
+                TickFrequency="{x:Static viewModels:WindowZoomViewModel.SliderStepPercentage}"
+                Value="{Binding Percentage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                Width="120">
+          <Slider.LayoutTransform>
+            <ScaleTransform ScaleX="0.7" ScaleY="0.7" />
+          </Slider.LayoutTransform>
+          <Slider.InputBindings>
+            <KeyBinding Command="{Binding ClosePopupCommand}" Key="Escape" />
+          </Slider.InputBindings>
+        </Slider>
+      </Border>
+    </Popup>
+  </Grid>
+</UserControl>

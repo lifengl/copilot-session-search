@@ -173,6 +173,35 @@ public sealed class SessionDetailsViewModelTests
         Assert.Equal(2, viewChangeCount);
     }
 
+    [Fact]
+    public void DetailViewUsesSuppliedInitialZoom()
+    {
+        SessionSearchResult result = CreateResult(
+            [
+                new MatchSection(
+                    "event-1",
+                    1,
+                    ConversationSpeaker.Copilot,
+                    DateTimeOffset.Parse("2026-09-01T10:00:00Z"),
+                    "needle",
+                    "needle",
+                    "A message containing needle.",
+                    1,
+                    false),
+            ]);
+        var viewModel = new SessionDetailsViewModel(
+            result,
+            new NoOpConsoleLauncher(),
+            new RecordingClipboardService(),
+            initialZoomPercentage: 140);
+
+        Assert.Equal(140, viewModel.Zoom.Percentage);
+
+        viewModel.Zoom.ZoomOutCommand.Execute(null);
+
+        Assert.Equal(130, viewModel.Zoom.Percentage);
+    }
+
     private static SessionSearchResult CreateResult(IReadOnlyList<MatchSection> sections)
     {
         SessionDescriptor descriptor = CreateDescriptor();

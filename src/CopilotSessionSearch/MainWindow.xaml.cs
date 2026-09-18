@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using CopilotSessionSearch.Controls;
 using CopilotSessionSearch.Models;
 using CopilotSessionSearch.Services;
 using CopilotSessionSearch.ViewModels;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
 
         _viewModel.OpenDetailsRequested += ShowDetails;
         Closing += OnClosing;
+        Deactivated += OnDeactivated;
         Loaded += OnLoaded;
     }
 
@@ -48,6 +50,23 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape
+            && Keyboard.Modifiers == ModifierKeys.None
+            && _viewModel.Zoom.IsPopupOpen)
+        {
+            _viewModel.Zoom.IsPopupOpen = false;
+            e.Handled = true;
+            return;
+        }
+
+        if (_viewModel.Zoom.TryHandleShortcut(
+            e.Key,
+            Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.SystemKey == Key.T
             && Keyboard.Modifiers == ModifierKeys.Alt)
         {
@@ -75,6 +94,22 @@ public partial class MainWindow : Window
         SearchTextBox.Focus();
         SearchTextBox.SelectAll();
         e.Handled = true;
+    }
+
+    private void MainWindow_PreviewMouseDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_viewModel.Zoom.IsPopupOpen
+            && !ZoomStatusControl.IsSourceWithinZoomControl(e.OriginalSource))
+        {
+            _viewModel.Zoom.ClosePopupCommand.Execute(null);
+        }
+    }
+
+    private void OnDeactivated(object? sender, EventArgs e)
+    {
+        _viewModel.Zoom.ClosePopupCommand.Execute(null);
     }
 
     private void ThemeMenuButton_Click(object sender, RoutedEventArgs e)
@@ -169,7 +204,8 @@ public partial class MainWindow : Window
             new SessionDetailsViewModel(
                 result,
                 _consoleLauncher,
-                _clipboardService))
+                _clipboardService,
+                _viewModel.Zoom.Percentage))
         {
             Owner = this,
         };

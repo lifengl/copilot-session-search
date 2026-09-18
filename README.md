@@ -16,6 +16,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Cancels an active search without removing results that have already been found.
 - Opens a new Windows Terminal or PowerShell window and resumes a selected session.
 - Supports and persists System, Light, and Dark Fluent themes.
+- Supports 50%-200% per-window zoom in 10% steps with Ctrl+Plus, Ctrl+Minus, and Ctrl+0.
 - Uses an original AI-search icon for the executable, taskbar, and application windows.
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 - Shows an example watermark in the empty search field for first-time guidance.
@@ -98,6 +99,8 @@ The dropdown beside Search contains four options:
 - **Use AI search (preview)** searches a persistent local hybrid index and sends only a bounded set of prefiltered excerpts to Copilot for ranking. While selected, the whole-word, case-sensitive, and regular-expression options are disabled and ignored, but their values are retained for later literal searches.
 
 The Search button is enabled when the window opens even if the query is empty, while keyboard focus starts in the query box. Activating Search with no text is a harmless no-op. Once a real search starts, the selected query and options are captured and the query box, Search button, and options dropdown remain disabled until the work completes or is canceled. Cancel remains enabled. Cached session documents contain raw conversation text and remain reusable across option combinations.
+
+The main window starts at 100% zoom. A newly opened detail window copies the main window's current zoom percentage, then maintains its own independent zoom setting. The status bar shows the active window's percentage immediately before its theme or conversation-filter button. Click the percentage to open a 50%-200% slider, which closes after five seconds without a zoom change. Double-click the percentage to reset that window to 100%, or use Ctrl+Plus, Ctrl+Minus, and Ctrl+0.
 
 Regular expressions are compiled once per search rather than added to the document cache. Invalid expressions are rejected before session loading begins. Matching uses cancellation checks and a finite timeout; expressions that take too long stop the search with an actionable error. Zero-length regular-expression matches are ignored because there is no text span to show or highlight.
 

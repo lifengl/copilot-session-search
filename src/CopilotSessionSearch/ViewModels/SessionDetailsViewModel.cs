@@ -10,7 +10,7 @@ using CopilotSessionSearch.Services;
 
 namespace CopilotSessionSearch.ViewModels;
 
-public sealed partial class SessionDetailsViewModel : ObservableObject
+public sealed partial class SessionDetailsViewModel : ObservableObject, IDisposable
 {
     private readonly IConsoleLauncher _consoleLauncher;
     private readonly IClipboardService _clipboardService;
@@ -42,7 +42,9 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     public SessionDetailsViewModel(
         SessionSearchResult result,
         IConsoleLauncher consoleLauncher,
-        IClipboardService clipboardService)
+        IClipboardService clipboardService,
+        int initialZoomPercentage =
+            WindowZoomViewModel.DefaultPercentage)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(consoleLauncher);
@@ -51,6 +53,7 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         Result = result;
         _consoleLauncher = consoleLauncher;
         _clipboardService = clipboardService;
+        Zoom = new WindowZoomViewModel(initialZoomPercentage);
         ILookup<string, MatchSection> sectionsByEntryId = result.Sections
             .ToLookup(
                 section => section.EntryId,
@@ -98,6 +101,8 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     public event Action? MessageViewChanged;
 
     public SessionSearchResult Result { get; }
+
+    public WindowZoomViewModel Zoom { get; }
 
     public string Name => Result.Session.Name;
 
@@ -163,6 +168,11 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
     public string SessionInfoButtonText => IsSessionInfoExpanded
         ? "Collapse session information"
         : "Expand session information";
+
+    public void Dispose()
+    {
+        Zoom.Dispose();
+    }
 
     [RelayCommand]
     private void ToggleSessionInfo()
