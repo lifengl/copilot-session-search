@@ -225,7 +225,9 @@
           <Button AutomationProperties.Name="Search"
                   Command="{Binding SearchCommand}"
                   IsDefault="True"
-                  MinWidth="88"
+                  MinHeight="30"
+                  MinWidth="80"
+                  Padding="10,4,6,4"
                   TabIndex="1"
                   ToolTip="Search (Enter or Alt+S)">
             <StackPanel Style="{StaticResource IconTextButtonContentStyle}"
@@ -242,15 +244,18 @@
           </Button>
           <Button x:Name="SearchOptionsButton"
                   Grid.Column="1"
+                  Panel.ZIndex="1"
                   AutomationProperties.HelpText="Choose literal, regular-expression, or AI-assisted matching"
                   AutomationProperties.Name="Search options"
                   Click="SearchOptionsButton_Click"
                   IsEnabled="{Binding AreSearchInputsEnabled}"
-                  Margin="1,0,0,0"
-                  MinWidth="30"
-                  Padding="4"
+                  Margin="-1,0,0,0"
+                  MinHeight="30"
+                  MinWidth="24"
+                  Padding="2"
                   TabIndex="2"
-                  ToolTip="Search options (Alt+O)">
+                  ToolTip="Search options (Alt+O)"
+                  VerticalAlignment="Stretch">
             <Button.ContextMenu>
               <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                 <MenuItem Header="Match _whole word"

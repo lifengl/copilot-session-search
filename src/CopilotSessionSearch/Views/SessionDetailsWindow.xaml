@@ -176,7 +176,6 @@
       <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.AccentColorLight1BrushKey}}" />
       <Setter Property="Height" Value="24" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="IsHitTestVisible" Value="False" />
       <Setter Property="IsTabStop" Value="False" />
       <Setter Property="Opacity" Value="0" />
       <Setter Property="Padding" Value="0" />
@@ -209,16 +208,10 @@
         <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
           <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
         </DataTrigger>
-        <MultiDataTrigger>
-          <MultiDataTrigger.Conditions>
-            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type DockPanel}}}"
-                       Value="True" />
-            <Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}"
-                       Value="True" />
-          </MultiDataTrigger.Conditions>
-          <Setter Property="IsHitTestVisible" Value="True" />
+        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type DockPanel}}}"
+                     Value="True">
           <Setter Property="Opacity" Value="1" />
-        </MultiDataTrigger>
+        </DataTrigger>
       </Style.Triggers>
     </Style>
   </Window.Resources>
@@ -329,6 +322,7 @@
                       ToolTip="Copy session ID">
                 <TextBlock FontFamily="Segoe Fluent Icons"
                            FontSize="12"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                            IsHitTestVisible="False"
                            Text="&#xE8C8;" />
               </Button>
@@ -357,6 +351,7 @@
                       ToolTip="Copy working directory">
                 <TextBlock FontFamily="Segoe Fluent Icons"
                            FontSize="12"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                            IsHitTestVisible="False"
                            Text="&#xE8C8;" />
               </Button>
@@ -446,6 +441,7 @@
                       ToolTip="Copy resume command">
                 <TextBlock FontFamily="Segoe Fluent Icons"
                            FontSize="12"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                            IsHitTestVisible="False"
                            Text="&#xE8C8;" />
               </Button>
