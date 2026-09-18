@@ -14,12 +14,17 @@ public sealed class SessionSearchCoordinator
     private readonly ISessionHistorySource _historySource;
     private readonly SessionDocumentCache _documentCache;
     private readonly SessionSearchService _searchService;
+    private readonly IAiSessionSearchCoordinator? _aiSearchCoordinator;
     private readonly int _maximumConcurrency;
+
+    public bool IsAiSearchIndexReady =>
+        _aiSearchCoordinator?.IsReady is true;
 
     public SessionSearchCoordinator(
         ISessionHistorySource historySource,
         SessionDocumentCache documentCache,
         SessionSearchService searchService,
+        IAiSessionSearchCoordinator? aiSearchCoordinator = null,
         int? maximumConcurrency = null)
     {
         ArgumentNullException.ThrowIfNull(historySource);
@@ -39,6 +44,7 @@ public sealed class SessionSearchCoordinator
         _historySource = historySource;
         _documentCache = documentCache;
         _searchService = searchService;
+        _aiSearchCoordinator = aiSearchCoordinator;
         _maximumConcurrency = resolvedMaximumConcurrency;
     }
 
@@ -51,12 +57,35 @@ public sealed class SessionSearchCoordinator
             cancellationToken);
     }
 
+    public Task<HybridIndexMetrics> PrepareAiSearchAsync(
+        IProgress<HybridIndexProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        return (_aiSearchCoordinator
+                ?? throw new InvalidOperationException(
+                    "AI search is not configured."))
+            .PrepareAsync(
+                progress,
+                cancellationToken);
+    }
+
     public IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
         string query,
         SessionSearchOptions options,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+
+        if (options.UseAiSearch)
+        {
+            return (_aiSearchCoordinator
+                    ?? throw new InvalidOperationException(
+                        "AI search is not configured."))
+                .SearchAsync(
+                    query.Trim(),
+                    options,
+                    cancellationToken);
+        }
 
         return SearchAsync(
             TextSearchPattern.Create(query, options),

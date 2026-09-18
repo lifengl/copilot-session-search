@@ -77,6 +77,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(AppThemePreference.Dark, themePreferenceStore.SavedPreference);
         Assert.True(viewModel.IsDarkTheme);
         Assert.True(viewModel.AreSearchInputsEnabled);
+        Assert.True(viewModel.AreLiteralSearchOptionsEnabled);
         Assert.False(viewModel.CancelCommand.CanExecute(null));
 
         Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
@@ -116,6 +117,137 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(
             [newest.SessionId, middle.SessionId, oldest.SessionId],
             viewModel.Results.Select(result => result.Result.Session.SessionId));
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AiOptionPreparesIndexWithoutDisablingQueryInput()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var aiCoordinator = new BlockingAiSearchCoordinator();
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            aiCoordinator);
+        var viewModel = new MainWindowViewModel(
+            coordinator,
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore())
+        {
+            IsCaseSensitive = true,
+            MatchWholeWord = true,
+            UseRegularExpression = true,
+        };
+
+        viewModel.UseAiSearch = true;
+        await aiCoordinator.PreparationStarted;
+
+        Assert.True(viewModel.IsPreparingAiSearch);
+        Assert.True(viewModel.IsBackgroundWorkActive);
+        Assert.True(viewModel.AreSearchInputsEnabled);
+        Assert.False(viewModel.AreLiteralSearchOptionsEnabled);
+        Assert.True(viewModel.CancelCommand.CanExecute(null));
+        Assert.True(viewModel.IsCaseSensitive);
+        Assert.True(viewModel.MatchWholeWord);
+        Assert.True(viewModel.UseRegularExpression);
+
+        viewModel.CancelCommand.Execute(null);
+        await WaitUntilAsync(
+            () => !viewModel.IsPreparingAiSearch,
+            TimeSpan.FromSeconds(2));
+
+        Assert.False(viewModel.IsBackgroundWorkActive);
+        Assert.Contains(
+            "canceled",
+            viewModel.StatusText,
+            StringComparison.OrdinalIgnoreCase);
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task CancelingAiSearchLeavesBackgroundIndexPreparationRunning()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var aiCoordinator = new ConcurrentAiSearchCoordinator();
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            aiCoordinator);
+        var viewModel = new MainWindowViewModel(
+            coordinator,
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore())
+        {
+            SearchText = "Find a prior investigation",
+            UseAiSearch = true,
+        };
+        await aiCoordinator.PreparationStarted;
+
+        Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
+        await aiCoordinator.SearchStarted;
+        viewModel.CancelCommand.Execute(null);
+        await searchTask;
+
+        Assert.False(viewModel.IsSearching);
+        Assert.True(viewModel.IsPreparingAiSearch);
+        Assert.False(aiCoordinator.PreparationWasCanceled);
+
+        aiCoordinator.CompletePreparation();
+        await WaitUntilAsync(
+            () => !viewModel.IsPreparingAiSearch,
+            TimeSpan.FromSeconds(2));
+        Assert.True(aiCoordinator.IsReady);
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AiRerankingUsesIndeterminateProgress()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var aiCoordinator = new BlockingRerankingAiSearchCoordinator();
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            aiCoordinator);
+        var viewModel = new MainWindowViewModel(
+            coordinator,
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore())
+        {
+            SearchText = "Find a prior investigation",
+            UseAiSearch = true,
+        };
+
+        Task searchTask = viewModel.SearchCommand.ExecuteAsync(null);
+        await aiCoordinator.RerankingStarted;
+
+        Assert.True(viewModel.IsSearching);
+        Assert.True(viewModel.IsProgressIndeterminate);
+        Assert.Equal(viewModel.TotalSessionCount, viewModel.CompletedSessionCount);
+        Assert.Equal(
+            "Asking Copilot to rank 24 hybrid message blocks...",
+            viewModel.StatusText);
+
+        aiCoordinator.CompleteReranking();
+        await searchTask;
+
+        Assert.False(viewModel.IsSearching);
+        Assert.False(viewModel.IsProgressIndeterminate);
 
         await viewModel.DisposeAsync();
     }
@@ -249,6 +381,163 @@ public sealed class MainWindowViewModelTests
         public void Save(AppThemePreference preference)
         {
             SavedPreference = preference;
+        }
+    }
+
+    private sealed class BlockingAiSearchCoordinator :
+        IAiSessionSearchCoordinator
+    {
+        private readonly TaskCompletionSource _preparationStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task PreparationStarted => _preparationStarted.Task;
+
+        public bool IsReady => false;
+
+        public async Task<HybridIndexMetrics> PrepareAsync(
+            IProgress<HybridIndexProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            _preparationStarted.TrySetResult();
+            await Task.Delay(
+                Timeout.InfiniteTimeSpan,
+                cancellationToken);
+            throw new InvalidOperationException(
+                "The cancellation delay unexpectedly completed.");
+        }
+
+        public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+            string query,
+            SessionSearchOptions options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class ConcurrentAiSearchCoordinator :
+        IAiSessionSearchCoordinator
+    {
+        private readonly TaskCompletionSource _preparationStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _preparationCompletion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _searchStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsReady { get; private set; }
+
+        public bool PreparationWasCanceled { get; private set; }
+
+        public Task PreparationStarted => _preparationStarted.Task;
+
+        public Task SearchStarted => _searchStarted.Task;
+
+        public async Task<HybridIndexMetrics> PrepareAsync(
+            IProgress<HybridIndexProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            _preparationStarted.TrySetResult();
+            try
+            {
+                await _preparationCompletion.Task.WaitAsync(
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                PreparationWasCanceled = true;
+                throw;
+            }
+
+            IsReady = true;
+            return new HybridIndexMetrics(
+                Sessions: 0,
+                Messages: 0,
+                Blocks: 0,
+                EmbeddingBytes: 0,
+                DatabaseBytes: 0,
+                UpdatedSessions: 0,
+                RemovedSessions: 0,
+                Failures: [],
+                UpdateTime: TimeSpan.Zero);
+        }
+
+        public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+            string query,
+            SessionSearchOptions options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            _searchStarted.TrySetResult();
+            await Task.Delay(
+                Timeout.InfiniteTimeSpan,
+                cancellationToken);
+            yield break;
+        }
+
+        public void CompletePreparation()
+        {
+            _preparationCompletion.TrySetResult();
+        }
+    }
+
+    private sealed class BlockingRerankingAiSearchCoordinator :
+        IAiSessionSearchCoordinator
+    {
+        private readonly TaskCompletionSource _rerankingStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _rerankingCompletion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsReady => true;
+
+        public Task RerankingStarted => _rerankingStarted.Task;
+
+        public Task<HybridIndexMetrics> PrepareAsync(
+            IProgress<HybridIndexProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
+                new HybridIndexMetrics(
+                    Sessions: 10,
+                    Messages: 10,
+                    Blocks: 24,
+                    EmbeddingBytes: 0,
+                    DatabaseBytes: 0,
+                    UpdatedSessions: 0,
+                    RemovedSessions: 0,
+                    Failures: [],
+                    UpdateTime: TimeSpan.Zero));
+        }
+
+        public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+            string query,
+            SessionSearchOptions options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            yield return new SessionSearchUpdate(
+                null,
+                null,
+                new SessionSearchProgress(10, 10, 0, 0),
+                "Asking Copilot to rank 24 hybrid message blocks...",
+                IsProgressIndeterminate: true);
+            _rerankingStarted.TrySetResult();
+            await _rerankingCompletion.Task.WaitAsync(cancellationToken);
+            yield return new SessionSearchUpdate(
+                null,
+                null,
+                new SessionSearchProgress(10, 10, 0, 0),
+                "AI search complete.");
+        }
+
+        public void CompleteReranking()
+        {
+            _rerankingCompletion.TrySetResult();
         }
     }
 }

@@ -20,6 +20,7 @@ A small Windows application for searching local GitHub Copilot CLI conversation 
 - Shows live search status, progress, and matched-session totals in a bottom status bar.
 - Shows an example watermark in the empty search field for first-time guidance.
 - Offers regular-expression, whole-word, and case-sensitive options from the Search dropdown.
+- Offers preview AI-assisted retrieval that locally prefilters history before sending bounded excerpts to Copilot for relevance ranking.
 
 ## Requirements
 
@@ -89,22 +90,63 @@ Fenced code blocks use AvalonEdit. Light mode retains its language syntax highli
 
 ## Search options
 
-The dropdown beside Search contains three independent options:
+The dropdown beside Search contains four options:
 
 - **Match whole word** requires boundaries around the actual text matched when it begins or ends with a letter, digit, or underscore. This works with literal and regular-expression searches and avoids matching short terms inside longer words or identifiers.
 - **Case sensitive** uses exact casing. When it is off, regular expressions use `RegexOptions.IgnoreCase` with culture-invariant matching, so patterns do not need constructs such as `[hH]`.
 - **Use regular expression** is separated as the final advanced option and interprets the search text as a .NET regular expression. For example, `hot ?reload` matches both `HotReload` and `hot reload` when **Case sensitive** is off.
+- **Use AI search (preview)** searches a persistent local hybrid index and sends only a bounded set of prefiltered excerpts to Copilot for ranking. While selected, the whole-word, case-sensitive, and regular-expression options are disabled and ignored, but their values are retained for later literal searches.
 
 The Search button is enabled when the window opens even if the query is empty, while keyboard focus starts in the query box. Activating Search with no text is a harmless no-op. Once a real search starts, the selected query and options are captured and the query box, Search button, and options dropdown remain disabled until the work completes or is canceled. Cancel remains enabled. Cached session documents contain raw conversation text and remain reusable across option combinations.
 
 Regular expressions are compiled once per search rather than added to the document cache. Invalid expressions are rejected before session loading begins. Matching uses cancellation checks and a finite timeout; expressions that take too long stop the search with an actionable error. Zero-length regular-expression matches are ignored because there is no text span to show or highlight.
+
+## AI search
+
+AI search uses local retrieval followed by one Copilot model call to rank the strongest evidence. Result rows display the AI relevance score and reason; opening a result shows the selected evidence messages and still allows switching to the whole cached conversation.
+
+Enabling AI search starts local-index preparation in the background while the query box remains editable. The index is stored under `%LOCALAPPDATA%\CopilotSessionSearch`, versioned by schema/parser/chunker/FTS/embedding settings, and incrementally reconciled by session ID and modification time on later launches. Cancel stops preparation safely; committed session updates remain reusable.
+
+It sends no complete history archive. Local retrieval combines word and trigram FTS5/BM25, compact CPU-only local embeddings, exact/proximity evidence scoring, and reciprocal-rank fusion. It sends at most 24 message blocks to Copilot, reports the actual count in the status bar, then aggregates up to 15 ranked blocks back into sessions for display. AI mode excludes sessions active within the last hour to avoid ongoing/self-referential conversations. The temporary SDK session disables session-store retrieval, memory, skills, configuration discovery, infinite sessions, and tool permission; the session is deleted after the search. Reserved AI-session IDs are also excluded from future history snapshots as cleanup defense-in-depth. Each AI search consumes one Copilot reranking call.
+
+`tools\AiSearchSpike` remains available as a console harness over the same production services:
+
+```powershell
+dotnet run --project tools\AiSearchSpike\AiSearchSpike.csproj --configuration Release -- `
+    "Find the earlier performance comparison between ClrMD 4.1 and 3.x" `
+    "$env:TEMP\copilot-ai-search-report.json"
+```
+
+The report contains local conversation excerpts and must be handled as sensitive user data. It is not added to the repository.
+
+## Hybrid local-search spike
+
+`tools\HybridSearchSpike` compares local word/trigram FTS5 BM25, compact local embeddings, exact/proximity evidence scoring, reciprocal-rank fusion, and an optional final Copilot block rerank. It uses the CPU-only `bge-micro-v2` ONNX model downloaded by `SmartComponents.LocalEmbeddings`; no conversation text is sent anywhere while building embeddings or running the local retrieval channels.
+
+The current sample index contains approximately 18,800 message chunks from 17,800 messages. Initial history loading and embedding/index construction took about 140 seconds and produced an 82 MiB SQLite database plus the 17 MiB local model. Reopening the persisted index avoids that cost; warm local queries complete in roughly 50-200 milliseconds. The optional final stage sends the top 24 hybrid blocks to Copilot and consumes Copilot usage.
+
+```powershell
+# Build a new local index and run the default ClrMD and CPS NFE queries
+dotnet run --project tools\HybridSearchSpike\HybridSearchSpike.csproj --configuration Release -- `
+    "$env:TEMP\copilot-hybrid-index.sqlite" `
+    "$env:TEMP\copilot-hybrid-report.json"
+
+# Reuse the existing index for later query/ranking experiments
+dotnet run --project tools\HybridSearchSpike\HybridSearchSpike.csproj --configuration Release -- `
+    --reuse `
+    "$env:TEMP\copilot-hybrid-index.sqlite" `
+    "$env:TEMP\copilot-hybrid-report.json" `
+    "deadlock related to debugger source handling"
+```
+
+The SQLite index, embeddings, and JSON report contain sensitive derived user data and must remain local. They are disposable spike artifacts and are not added to the repository.
 
 ## Status bar
 
 The bottom status bar keeps secondary information out of the primary search row. It contains:
 
 - Current search state and completed-session progress.
-- A determinate progress indicator while searching.
+- A determinate progress indicator while scanning sessions or updating the index, and an indeterminate indicator while local AI retrieval or Copilot reranking is active.
 - The total number of matched sessions.
 - A compact icon-only theme button. Its menu shows monitor **System**, sun **Light**, and crescent **Dark** choices with text and checkmarks.
 

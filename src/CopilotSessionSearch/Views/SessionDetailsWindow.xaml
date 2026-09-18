@@ -27,6 +27,7 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock FontWeight="SemiBold">
@@ -68,7 +69,29 @@
           </TextBlock.Style>
         </TextBlock>
 
-        <Border Grid.Row="1">
+        <TextBlock Grid.Row="1"
+                   FontStyle="Italic"
+                   Margin="0,3,0,0"
+                   Text="{Binding AiReason, Mode=OneTime}"
+                   TextWrapping="Wrap">
+          <TextBlock.Style>
+            <Style TargetType="{x:Type TextBlock}">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <MultiDataTrigger>
+                  <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding HasAiReason, Mode=OneTime}" Value="True" />
+                    <Condition Binding="{Binding DataContext.IsShowingWholeConversation, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                               Value="False" />
+                  </MultiDataTrigger.Conditions>
+                  <Setter Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+
+        <Border Grid.Row="2">
           <Border.Style>
             <Style TargetType="{x:Type Border}">
               <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
@@ -88,7 +111,7 @@
           <controls:SelectableMarkdownViewer AutomationProperties.Name="Rendered conversation message"
                                              Background="Transparent"
                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}"
-                                             HighlightText="{Binding Query, Mode=OneTime}"
+                                             HighlightText="{Binding HighlightText, Mode=OneTime}"
                                              HorizontalScrollBarVisibility="Auto"
                                              IsCaseSensitive="{Binding IsCaseSensitive, Mode=OneTime}"
                                              IsSelectionEnabled="True"

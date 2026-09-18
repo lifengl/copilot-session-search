@@ -20,15 +20,25 @@ public partial class App : Application
             var themeService = new ThemeService();
             themeService.Apply(themePreference);
             var historySource = new CopilotSdkSessionHistorySource();
+            var documentCache = new SessionDocumentCache();
+            var hybridSearchIndex = new PersistentHybridSearchIndex(
+                PersistentHybridSearchIndex.GetDefaultDatabasePath());
+            var aiSearchCoordinator = new AiSessionSearchCoordinator(
+                historySource,
+                documentCache,
+                hybridSearchIndex,
+                new CopilotAiSearchSessionFactory(AppContext.BaseDirectory));
             var searchCoordinator = new SessionSearchCoordinator(
                 historySource,
-                new SessionDocumentCache(),
-                new SessionSearchService());
+                documentCache,
+                new SessionSearchService(),
+                aiSearchCoordinator);
             var viewModel = new MainWindowViewModel(
                 searchCoordinator,
                 historySource,
                 themeService,
-                themePreferenceStore);
+                themePreferenceStore,
+                hybridSearchIndex);
             var window = new MainWindow(
                 viewModel,
                 new ConsoleLauncher(),

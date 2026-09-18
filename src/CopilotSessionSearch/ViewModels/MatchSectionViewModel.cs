@@ -24,6 +24,10 @@ public sealed class MatchSectionViewModel
 
     public string Query { get; }
 
+    public string HighlightText => Options.UseAiSearch
+        ? string.Empty
+        : Query;
+
     public SessionSearchOptions Options { get; }
 
     public bool MatchWholeWord => Options.MatchWholeWord;
@@ -31,6 +35,16 @@ public sealed class MatchSectionViewModel
     public bool IsCaseSensitive => Options.IsCaseSensitive;
 
     public bool UseRegularExpression => Options.UseRegularExpression;
+
+    public bool UseAiSearch => Options.UseAiSearch;
+
+    public string AiScoreText => Section.AiRelevance is AiRelevanceInfo relevance
+        ? $" - AI {relevance.Score}"
+        : string.Empty;
+
+    public string? AiReason => Section.AiRelevance?.Reason;
+
+    public bool HasAiReason => AiReason is not null;
 
     public string SpeakerText => Section.Speaker == ConversationSpeaker.User
         ? "You"

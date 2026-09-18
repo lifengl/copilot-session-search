@@ -31,10 +31,16 @@ public sealed class SessionSearchResultViewModel
         ? "(working directory unavailable)"
         : Result.Session.WorkingDirectory;
 
-    public string MatchCountText => DisplayTextFormatter.FormatCount(
-        Result.MatchCount,
-        "match",
-        "matches");
+    public string MatchCountText => Result.AiRelevance is AiRelevanceInfo relevance
+        ? $"AI relevance {relevance.Score} ({relevance.Confidence})"
+        : DisplayTextFormatter.FormatCount(
+            Result.MatchCount,
+            "match",
+            "matches");
+
+    public string? AiReason => Result.AiRelevance?.Reason;
+
+    public bool HasAiReason => AiReason is not null;
 
     public DateTimeOffset ModifiedTime => Result.Session.ModifiedTime;
 

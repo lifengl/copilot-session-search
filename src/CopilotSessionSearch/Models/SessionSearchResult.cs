@@ -16,7 +16,8 @@ public sealed class SessionSearchResult
             query,
             SessionSearchOptions.Default,
             sections,
-            matchCount)
+            matchCount,
+            aiRelevance: null)
     {
     }
 
@@ -25,7 +26,8 @@ public sealed class SessionSearchResult
         string query,
         SessionSearchOptions options,
         IEnumerable<MatchSection> sections,
-        int matchCount)
+        int matchCount,
+        AiRelevanceInfo? aiRelevance = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -38,6 +40,7 @@ public sealed class SessionSearchResult
         Sections = sections.ToArray();
         Samples = Sections.Take(MaximumSamples).ToArray();
         MatchCount = matchCount;
+        AiRelevance = aiRelevance;
     }
 
     public SessionDocument Document { get; }
@@ -53,6 +56,8 @@ public sealed class SessionSearchResult
     public IReadOnlyList<MatchSection> Samples { get; }
 
     public int MatchCount { get; }
+
+    public AiRelevanceInfo? AiRelevance { get; }
 
     public int MessageCount => Document.MessageCount;
 

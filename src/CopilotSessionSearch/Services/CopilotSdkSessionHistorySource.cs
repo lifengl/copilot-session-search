@@ -10,6 +10,8 @@ namespace CopilotSessionSearch.Services;
 public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
 {
     private const long EventsPerPage = 1000;
+    private const string AiSearchSessionPrefix =
+        "copilot-session-search-ai-";
 
     private readonly CopilotClient _client;
     private readonly SemaphoreSlim _sessionListGate = new(1, 1);
@@ -55,7 +57,12 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             _sessionSnapshot = sessions
-                .Where(session => !session.IsRemote)
+                .Where(
+                    session =>
+                        !session.IsRemote
+                        && !session.SessionId.StartsWith(
+                            AiSearchSessionPrefix,
+                            StringComparison.Ordinal))
                 .Select(CreateDescriptor)
                 .OrderByDescending(session => session.ModifiedTime)
                 .ToArray();

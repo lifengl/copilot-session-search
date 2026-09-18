@@ -157,7 +157,8 @@ public partial class MainWindow : Window
             result.Query,
             result.Options.MatchWholeWord,
             result.Options.IsCaseSensitive,
-            result.Options.UseRegularExpression);
+            result.Options.UseRegularExpression,
+            result.Options.UseAiSearch);
         if (_detailWindows.TryGetValue(windowKey, out SessionDetailsWindow? existingWindow))
         {
             existingWindow.Activate();

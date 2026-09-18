@@ -11,4 +11,5 @@ public sealed record MatchSection(
     string DetailText,
     string FullText,
     int OccurrenceCount,
-    bool HasAdditionalText);
+    bool HasAdditionalText,
+    AiRelevanceInfo? AiRelevance = null);

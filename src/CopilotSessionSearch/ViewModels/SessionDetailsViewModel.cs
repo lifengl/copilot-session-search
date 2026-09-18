@@ -51,11 +51,23 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
         Result = result;
         _consoleLauncher = consoleLauncher;
         _clipboardService = clipboardService;
-        Dictionary<string, int> occurrenceCounts = result.Sections
-            .GroupBy(section => section.EntryId, StringComparer.Ordinal)
-            .ToDictionary(
+        ILookup<string, MatchSection> sectionsByEntryId = result.Sections
+            .ToLookup(
+                section => section.EntryId,
+                StringComparer.Ordinal);
+        Dictionary<string, int> occurrenceCounts =
+            sectionsByEntryId.ToDictionary(
                 group => group.Key,
                 group => group.Sum(section => section.OccurrenceCount),
+                StringComparer.Ordinal);
+        Dictionary<string, AiRelevanceInfo?> relevanceByEntryId =
+            sectionsByEntryId.ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(section => section.AiRelevance)
+                    .OfType<AiRelevanceInfo>()
+                    .OrderByDescending(relevance => relevance.Score)
+                    .FirstOrDefault(),
                 StringComparer.Ordinal);
         _allMessages = result.Document.Entries
             .Select(
@@ -66,10 +78,18 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
                     result.Options,
                     occurrenceCounts.TryGetValue(entry.EventId, out int count)
                         ? count
-                        : 0))
+                        : 0,
+                    relevanceByEntryId.GetValueOrDefault(entry.EventId)))
             .ToArray();
-        _matchingMessages = _allMessages
-            .Where(message => message.IsMatch)
+        Dictionary<string, SessionDetailMessageViewModel> messagesByEntryId =
+            _allMessages.ToDictionary(
+                message => message.EntryId,
+                StringComparer.Ordinal);
+        _matchingMessages = result.Sections
+            .Select(section => section.EntryId)
+            .Distinct(StringComparer.Ordinal)
+            .Where(messagesByEntryId.ContainsKey)
+            .Select(entryId => messagesByEntryId[entryId])
             .ToArray();
         Messages = _matchingMessages;
         SelectedMessage = Messages.FirstOrDefault();
@@ -125,7 +145,9 @@ public sealed partial class SessionDetailsViewModel : ObservableObject
 
     public string SessionSpanSummaryText => $"{SessionSpanText} - {MessageCountText}";
 
-    public string SearchSummaryText => $"{Query} - {MatchCountText}";
+    public string SearchSummaryText => Result.AiRelevance is AiRelevanceInfo relevance
+        ? $"{Query} - AI relevance {relevance.Score} ({relevance.Confidence})"
+        : $"{Query} - {MatchCountText}";
 
     public string ResumeCommandText => $"copilot --resume={SessionId}";
 

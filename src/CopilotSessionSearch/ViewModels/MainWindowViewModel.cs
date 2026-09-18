@@ -16,8 +16,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private readonly ISessionHistorySource _historySource;
     private readonly IThemePreferenceStore _themePreferenceStore;
     private readonly IThemeService _themeService;
+    private readonly IDisposable? _aiIndex;
     private CancellationTokenSource? _searchCancellationSource;
+    private CancellationTokenSource? _aiPreparationCancellationSource;
     private Task _activeSearchTask = Task.CompletedTask;
+    private Task _aiPreparationTask = Task.CompletedTask;
     private SessionSearchProgress _latestProgress = new(0, 0, 0, 0);
     private bool _disposed;
 
@@ -28,7 +31,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     [NotifyPropertyChangedFor(nameof(AreSearchInputsEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsBackgroundWorkActive))]
     private bool _isSearching;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+    [NotifyPropertyChangedFor(nameof(IsBackgroundWorkActive))]
+    private bool _isPreparingAiSearch;
+
+    [ObservableProperty]
+    private bool _isProgressIndeterminate;
 
     [ObservableProperty]
     private string _statusText = "Enter text to search local Copilot sessions.";
@@ -62,11 +74,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     private bool _useRegularExpression;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AreLiteralSearchOptionsEnabled))]
+    private bool _useAiSearch;
+
     public MainWindowViewModel(
         SessionSearchCoordinator searchCoordinator,
         ISessionHistorySource historySource,
         IThemeService themeService,
-        IThemePreferenceStore themePreferenceStore)
+        IThemePreferenceStore themePreferenceStore,
+        IDisposable? aiIndex = null)
     {
         ArgumentNullException.ThrowIfNull(searchCoordinator);
         ArgumentNullException.ThrowIfNull(historySource);
@@ -77,6 +94,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         _historySource = historySource;
         _themeService = themeService;
         _themePreferenceStore = themePreferenceStore;
+        _aiIndex = aiIndex;
         ThemeOptions =
         [
             new ThemeOption(AppThemePreference.System, "System"),
@@ -118,6 +136,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         : $"{MatchingSessionCount:N0} matched sessions";
 
     public bool AreSearchInputsEnabled => !IsSearching;
+
+    public bool AreLiteralSearchOptionsEnabled => !UseAiSearch;
+
+    public bool IsBackgroundWorkActive =>
+        IsSearching || IsPreparingAiSearch;
+
+    partial void OnUseAiSearchChanged(bool value)
+    {
+        if (value)
+        {
+            StartAiPreparation();
+        }
+        else
+        {
+            _aiPreparationCancellationSource?.Cancel();
+        }
+    }
 
     partial void OnSelectedThemeOptionChanged(ThemeOption value)
     {
@@ -162,33 +197,51 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         var options = new SessionSearchOptions(
             MatchWholeWord: MatchWholeWord,
             IsCaseSensitive: IsCaseSensitive,
-            UseRegularExpression: UseRegularExpression);
+            UseRegularExpression: UseRegularExpression,
+            UseAiSearch: UseAiSearch);
 
-        TextSearchPattern pattern;
-        try
+        if (options.UseAiSearch
+            && !_searchCoordinator.IsAiSearchIndexReady)
         {
-            pattern = TextSearchPattern.Create(SearchText, options);
-        }
-        catch (ArgumentException ex) when (options.UseRegularExpression)
-        {
-            ErrorMessage = $"Invalid regular expression: {ex.Message}";
-            StatusText = "Enter a valid regular expression.";
-            return Task.CompletedTask;
+            StartAiPreparation();
         }
 
-        _activeSearchTask = RunSearchAsync(pattern);
+        if (!options.UseAiSearch)
+        {
+            try
+            {
+                _ = TextSearchPattern.Create(SearchText, options);
+            }
+            catch (ArgumentException ex) when (options.UseRegularExpression)
+            {
+                ErrorMessage = $"Invalid regular expression: {ex.Message}";
+                StatusText = "Enter a valid regular expression.";
+                return Task.CompletedTask;
+            }
+        }
+
+        _activeSearchTask = RunSearchAsync(
+            SearchText.Trim(),
+            options);
         return _activeSearchTask;
     }
 
     private bool CanCancel()
     {
-        return IsSearching;
+        return IsBackgroundWorkActive;
     }
 
     [RelayCommand(CanExecute = nameof(CanCancel))]
     private void Cancel()
     {
-        _searchCancellationSource?.Cancel();
+        if (IsSearching)
+        {
+            _searchCancellationSource?.Cancel();
+        }
+        else
+        {
+            _aiPreparationCancellationSource?.Cancel();
+        }
     }
 
     [RelayCommand]
@@ -219,6 +272,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         _disposed = true;
         SearchCommand.NotifyCanExecuteChanged();
         _searchCancellationSource?.Cancel();
+        _aiPreparationCancellationSource?.Cancel();
 
         try
         {
@@ -228,12 +282,103 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         {
         }
 
+        try
+        {
+            await _aiPreparationTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
         _searchCancellationSource?.Dispose();
         _searchCancellationSource = null;
+        _aiPreparationCancellationSource?.Dispose();
+        _aiPreparationCancellationSource = null;
         await _historySource.DisposeAsync().ConfigureAwait(false);
+        _aiIndex?.Dispose();
     }
 
-    private async Task RunSearchAsync(TextSearchPattern pattern)
+    private void StartAiPreparation()
+    {
+        if (_disposed
+            || _searchCoordinator.IsAiSearchIndexReady
+            || IsPreparingAiSearch
+            || _aiPreparationTask.Status is
+                TaskStatus.WaitingForActivation
+                or TaskStatus.WaitingToRun
+                or TaskStatus.Running)
+        {
+            return;
+        }
+
+        _aiPreparationCancellationSource?.Dispose();
+        _aiPreparationCancellationSource =
+            new CancellationTokenSource();
+        var progress = new Progress<HybridIndexProgress>(
+            update =>
+            {
+                CompletedSessionCount = update.CompletedSessions;
+                TotalSessionCount = update.TotalSessions;
+                StatusText = update.StatusText;
+            });
+        _aiPreparationTask = RunAiPreparationAsync(
+            progress,
+            _aiPreparationCancellationSource);
+    }
+
+    private async Task RunAiPreparationAsync(
+        IProgress<HybridIndexProgress> progress,
+        CancellationTokenSource cancellationSource)
+    {
+        IsPreparingAiSearch = true;
+        ErrorMessage = null;
+        StatusText = "Preparing the local AI search index...";
+
+        try
+        {
+            HybridIndexMetrics metrics = await _searchCoordinator
+                .PrepareAiSearchAsync(
+                    progress,
+                    cancellationSource.Token);
+            StatusText =
+                $"Local AI index ready: {metrics.Blocks:N0} blocks, " +
+                $"{metrics.UpdatedSessions:N0} updated session(s).";
+            if (metrics.Failures.Count > 0)
+            {
+                ErrorMessage =
+                    $"{metrics.Failures.Count:N0} session(s) could not be indexed. " +
+                    $"Latest: {metrics.Failures[^1].Session.Name}: " +
+                    metrics.Failures[^1].Message;
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationSource.IsCancellationRequested)
+        {
+            StatusText = "Local AI index preparation canceled.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage =
+                $"Unable to prepare the local AI search index: {ex.Message}";
+            StatusText = "The local AI search index is unavailable.";
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                _aiPreparationCancellationSource,
+                cancellationSource))
+            {
+                _aiPreparationCancellationSource = null;
+            }
+
+            cancellationSource.Dispose();
+            IsPreparingAiSearch = false;
+        }
+    }
+
+    private async Task RunSearchAsync(
+        string query,
+        SessionSearchOptions options)
     {
         using var cancellationSource = new CancellationTokenSource();
         _searchCancellationSource = cancellationSource;
@@ -243,16 +388,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         SelectedResult = null;
         _latestProgress = new SessionSearchProgress(0, 0, 0, 0);
         UpdateProgress(_latestProgress);
+        IsProgressIndeterminate = false;
         StatusText = "Loading the session list...";
+        string? lastStageStatus = null;
 
         try
         {
             await foreach (SessionSearchUpdate update in _searchCoordinator.SearchAsync(
-                pattern,
+                query,
+                options,
                 cancellationSource.Token))
             {
                 _latestProgress = update.Progress;
                 UpdateProgress(update.Progress);
+                IsProgressIndeterminate = update.IsProgressIndeterminate;
 
                 if (update.Result is not null)
                 {
@@ -266,12 +415,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                         $"Latest: {update.Failure.Session.Name}: {update.Failure.Message}";
                 }
 
-                StatusText = FormatProgress(update.Progress);
+                if (update.WarningMessage is not null)
+                {
+                    ErrorMessage = update.WarningMessage;
+                }
+
+                StatusText = update.StatusText
+                    ?? FormatProgress(update.Progress);
+                lastStageStatus = update.StatusText;
             }
 
-            StatusText = _latestProgress.TotalSessions == 0
-                ? "No local Copilot sessions were found."
-                : $"Search complete. Searched {_latestProgress.TotalSessions:N0} sessions.";
+            StatusText = options.UseAiSearch && lastStageStatus is not null
+                ? lastStageStatus
+                : _latestProgress.TotalSessions == 0
+                    ? "No local Copilot sessions were found."
+                    : $"Search complete. Searched {_latestProgress.TotalSessions:N0} sessions.";
         }
         catch (OperationCanceledException) when (cancellationSource.IsCancellationRequested)
         {
@@ -298,6 +456,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 _searchCancellationSource = null;
             }
 
+            IsProgressIndeterminate = false;
             IsSearching = false;
         }
     }
@@ -307,7 +466,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         bool selectResult = SelectedResult is null;
         int insertionIndex = 0;
         while (insertionIndex < Results.Count
-            && Results[insertionIndex].ModifiedTime >= result.ModifiedTime)
+            && ShouldRemainBefore(
+                Results[insertionIndex],
+                result))
         {
             insertionIndex++;
         }
@@ -318,6 +479,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         {
             SelectedResult = result;
         }
+    }
+
+    private static bool ShouldRemainBefore(
+        SessionSearchResultViewModel existing,
+        SessionSearchResultViewModel candidate)
+    {
+        if (candidate.Result.Options.UseAiSearch)
+        {
+            int existingScore = existing.Result.AiRelevance?.Score ?? 0;
+            int candidateScore = candidate.Result.AiRelevance?.Score ?? 0;
+            return existingScore > candidateScore
+                || (existingScore == candidateScore
+                    && existing.ModifiedTime >= candidate.ModifiedTime);
+        }
+
+        return existing.ModifiedTime >= candidate.ModifiedTime;
     }
 
     private void UpdateProgress(SessionSearchProgress progress)

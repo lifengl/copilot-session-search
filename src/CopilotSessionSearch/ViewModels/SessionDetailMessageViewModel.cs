@@ -11,7 +11,8 @@ public sealed class SessionDetailMessageViewModel
         int messageNumber,
         string query,
         SessionSearchOptions options,
-        int occurrenceCount)
+        int occurrenceCount,
+        AiRelevanceInfo? aiRelevance)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -39,6 +40,7 @@ public sealed class SessionDetailMessageViewModel
         Query = query;
         Options = options;
         OccurrenceCount = occurrenceCount;
+        AiRelevance = aiRelevance;
     }
 
     public string EntryId { get; }
@@ -53,6 +55,10 @@ public sealed class SessionDetailMessageViewModel
 
     public string Query { get; }
 
+    public string HighlightText => Options.UseAiSearch
+        ? string.Empty
+        : Query;
+
     public SessionSearchOptions Options { get; }
 
     public bool MatchWholeWord => Options.MatchWholeWord;
@@ -61,7 +67,15 @@ public sealed class SessionDetailMessageViewModel
 
     public bool UseRegularExpression => Options.UseRegularExpression;
 
+    public bool UseAiSearch => Options.UseAiSearch;
+
     public int OccurrenceCount { get; }
+
+    public AiRelevanceInfo? AiRelevance { get; }
+
+    public string? AiReason => AiRelevance?.Reason;
+
+    public bool HasAiReason => AiReason is not null;
 
     public bool IsMatch => OccurrenceCount > 0;
 
@@ -73,10 +87,14 @@ public sealed class SessionDetailMessageViewModel
 
     public string MessageText => $"Message {MessageNumber:N0}";
 
-    public string OccurrenceText => DisplayTextFormatter.FormatCount(
-        OccurrenceCount,
-        "match",
-        "matches");
+    public string OccurrenceText => UseAiSearch
+        ? AiRelevance is null
+            ? "AI evidence"
+            : $"AI relevance {AiRelevance.Score} ({AiRelevance.Confidence})"
+        : DisplayTextFormatter.FormatCount(
+            OccurrenceCount,
+            "match",
+            "matches");
 
     public string AccessibleName =>
         $"{SpeakerText}, {MessageText}, {OccurrenceText}, {TimestampText}";

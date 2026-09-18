@@ -94,6 +94,33 @@ public sealed class SessionSearchCoordinatorTests
         Assert.True(historySource.CancelledLoadCount > 0);
     }
 
+    [Fact]
+    public async Task AiSearchDelegatesWithoutParsingLiteralOptions()
+    {
+        var aiCoordinator = new RecordingAiSearchCoordinator();
+        var historySource = new FakeHistorySource([], TimeSpan.Zero);
+        var coordinator = new SessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new SessionSearchService(),
+            aiCoordinator);
+        var options = new SessionSearchOptions(
+            MatchWholeWord: true,
+            IsCaseSensitive: true,
+            UseRegularExpression: true,
+            UseAiSearch: true);
+
+        await foreach (SessionSearchUpdate _ in coordinator.SearchAsync(
+            "[invalid regex",
+            options,
+            CancellationToken.None))
+        {
+        }
+
+        Assert.Equal("[invalid regex", aiCoordinator.Query);
+        Assert.Equal(options, aiCoordinator.Options);
+    }
+
     private static SessionDescriptor CreateDescriptor(int index)
     {
         return new SessionDescriptor(
@@ -201,6 +228,51 @@ public sealed class SessionSearchCoordinatorTests
                 ref _maximumObservedConcurrency,
                 candidate,
                 observed) != observed);
+        }
+    }
+
+    private sealed class RecordingAiSearchCoordinator :
+        IAiSessionSearchCoordinator
+    {
+        public bool IsReady => true;
+
+        public string? Query { get; private set; }
+
+        public SessionSearchOptions? Options { get; private set; }
+
+        public Task<HybridIndexMetrics> PrepareAsync(
+            IProgress<HybridIndexProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
+                new HybridIndexMetrics(
+                    Sessions: 0,
+                    Messages: 0,
+                    Blocks: 0,
+                    EmbeddingBytes: 0,
+                    DatabaseBytes: 0,
+                    UpdatedSessions: 0,
+                    RemovedSessions: 0,
+                    Failures: [],
+                    UpdateTime: TimeSpan.Zero));
+        }
+
+        public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+            string query,
+            SessionSearchOptions options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Query = query;
+            Options = options;
+            yield return new SessionSearchUpdate(
+                null,
+                null,
+                new SessionSearchProgress(0, 0, 0, 0),
+                "AI delegated.");
+            await Task.CompletedTask;
         }
     }
 }

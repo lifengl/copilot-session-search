@@ -21,8 +21,9 @@
             <Run Text="{Binding SpeakerText, Mode=OneTime}" />
             <Run Text=" - " />
             <Run Text="{Binding TimestampText, Mode=OneTime}" />
+            <Run Text="{Binding AiScoreText, Mode=OneTime}" />
           </TextBlock>
-          <controls:HighlightedTextBlock HighlightText="{Binding Query, Mode=OneTime}"
+          <controls:HighlightedTextBlock HighlightText="{Binding HighlightText, Mode=OneTime}"
                                          IsCaseSensitive="{Binding IsCaseSensitive, Mode=OneTime}"
                                          Margin="0,3,0,0"
                                          MatchWholeWord="{Binding MatchWholeWord, Mode=OneTime}"
@@ -39,6 +40,7 @@
       <Border Padding="12">
         <Grid>
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -67,7 +69,24 @@
                      Text="{Binding WorkingDirectory, Mode=OneTime}"
                      TextTrimming="CharacterEllipsis"
                      ToolTip="{Binding WorkingDirectory, Mode=OneTime}" />
-          <ItemsControl Grid.Row="3"
+          <TextBlock Grid.Row="3"
+                     Grid.ColumnSpan="2"
+                     FontStyle="Italic"
+                     Margin="0,3,0,0"
+                     Text="{Binding AiReason, Mode=OneTime}"
+                     TextWrapping="Wrap">
+            <TextBlock.Style>
+              <Style TargetType="{x:Type TextBlock}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding HasAiReason, Mode=OneTime}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+          <ItemsControl Grid.Row="4"
                         Grid.ColumnSpan="2"
                         ItemTemplate="{StaticResource SampleTemplate}"
                         ItemsSource="{Binding Samples, Mode=OneTime}" />
@@ -172,7 +191,7 @@
           </Button>
           <Button x:Name="SearchOptionsButton"
                   Grid.Column="1"
-                  AutomationProperties.HelpText="Choose regular-expression, whole-word, and case-sensitive matching"
+                  AutomationProperties.HelpText="Choose literal, regular-expression, or AI-assisted matching"
                   AutomationProperties.Name="Search options"
                   Click="SearchOptionsButton_Click"
                   IsEnabled="{Binding AreSearchInputsEnabled}"
@@ -186,19 +205,28 @@
                 <MenuItem Header="Match _whole word"
                           IsCheckable="True"
                           IsChecked="{Binding MatchWholeWord, Mode=TwoWay}"
+                          IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
                           ToolTip="Letters, digits, and underscore count as word characters" />
                 <MenuItem Header="_Case sensitive"
                           IsCheckable="True"
                           IsChecked="{Binding IsCaseSensitive, Mode=TwoWay}"
+                          IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
                           ToolTip="Match uppercase and lowercase exactly" />
                 <Separator />
                 <MenuItem Header="Use _regular expression"
                           IsCheckable="True"
                           IsChecked="{Binding UseRegularExpression, Mode=TwoWay}"
+                          IsEnabled="{Binding AreLiteralSearchOptionsEnabled}"
                           StaysOpenOnClick="True"
                           ToolTip="Interpret the search text as a .NET regular expression; leave Case sensitive unchecked to ignore casing" />
+                <Separator />
+                <MenuItem Header="Use _AI search (preview)"
+                          IsCheckable="True"
+                          IsChecked="{Binding UseAiSearch, Mode=TwoWay}"
+                          StaysOpenOnClick="True"
+                          ToolTip="Send the query and a bounded set of locally prefiltered excerpts to Copilot for relevance ranking" />
               </ContextMenu>
             </Button.ContextMenu>
             <TextBlock FontFamily="Segoe Fluent Icons"
@@ -210,7 +238,7 @@
         <Button Grid.Column="2"
                 Command="{Binding CancelCommand}"
                 Content="_Cancel"
-                IsEnabled="{Binding IsSearching}"
+                IsEnabled="{Binding IsBackgroundWorkActive}"
                 Margin="8,0,0,0"
                 MinWidth="88"
                 TabIndex="3"
@@ -276,13 +304,14 @@
                      VerticalAlignment="Center" />
 
           <ProgressBar Grid.Column="1"
-                       AutomationProperties.Name="Session search progress"
+                       AutomationProperties.Name="Search and index progress"
                        Height="3"
+                       IsIndeterminate="{Binding IsProgressIndeterminate}"
                        Margin="12,0,0,0"
                        Maximum="{Binding TotalSessionCount}"
                        Value="{Binding CompletedSessionCount}"
                        VerticalAlignment="Center"
-                       Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       Visibility="{Binding IsBackgroundWorkActive, Converter={StaticResource BooleanToVisibilityConverter}}"
                        Width="96" />
 
           <TextBlock Grid.Column="2"
