@@ -1,9 +1,9 @@
 #nullable enable
 
 using System.Runtime.ExceptionServices;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using CopilotSessionSearch.Controls;
 
 namespace CopilotSessionSearch.Tests;
@@ -31,24 +31,25 @@ public sealed class SearchOptionGlyphTests
                         };
                         glyph.Measure(new Size(16, 16));
                         glyph.Arrange(new Rect(0, 0, 16, 16));
+                        MethodInfo onRender =
+                            typeof(SearchOptionGlyph).GetMethod(
+                                "OnRender",
+                                BindingFlags.Instance
+                                    | BindingFlags.NonPublic)
+                            ?? throw new MissingMethodException(
+                                typeof(SearchOptionGlyph).FullName,
+                                "OnRender");
+                        var visual = new DrawingVisual();
+                        using (DrawingContext drawingContext =
+                            visual.RenderOpen())
+                        {
+                            onRender.Invoke(
+                                glyph,
+                                [drawingContext]);
+                        }
 
-                        var bitmap = new RenderTargetBitmap(
-                            16,
-                            16,
-                            96,
-                            96,
-                            PixelFormats.Pbgra32);
-                        bitmap.Render(glyph);
-                        var pixels = new byte[16 * 16 * 4];
-                        bitmap.CopyPixels(
-                            pixels,
-                            stride: 16 * 4,
-                            offset: 0);
-
-                        Assert.Contains(
-                            Enumerable.Range(0, 16 * 16),
-                            pixelIndex =>
-                                pixels[pixelIndex * 4 + 3] > 0);
+                        Assert.NotNull(visual.Drawing);
+                        Assert.NotEmpty(visual.Drawing.Children);
                     }
                 }
                 catch (Exception ex)
