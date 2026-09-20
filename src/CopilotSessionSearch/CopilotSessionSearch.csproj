@@ -22,4 +22,8 @@
     <Resource Include="Assets\CopilotSessionSearch.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="CopilotSessionSearch.Tests" />
+  </ItemGroup>
+
 </Project>

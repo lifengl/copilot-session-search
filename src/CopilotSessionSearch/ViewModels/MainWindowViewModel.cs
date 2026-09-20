@@ -22,6 +22,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private Task _activeSearchTask = Task.CompletedTask;
     private Task _aiPreparationTask = Task.CompletedTask;
     private SessionSearchProgress _latestProgress = new(0, 0, 0, 0);
+    private HybridIndexProgress? _latestAiPreparationProgress;
+    private string? _aiPreparationStatusText;
+    private string? _aiPreparationErrorMessage;
+    private bool _isAiPreparationStatePublished;
     private bool _disposed;
 
     [ObservableProperty]
@@ -75,6 +79,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AreLiteralSearchOptionsEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsBackgroundWorkActive))]
     [NotifyPropertyChangedFor(nameof(SearchWatermarkText))]
     private bool _useAiSearch;
 
@@ -146,17 +151,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public bool AreLiteralSearchOptionsEnabled => !UseAiSearch;
 
     public bool IsBackgroundWorkActive =>
-        IsSearching || IsPreparingAiSearch;
+        IsSearching || (UseAiSearch && IsPreparingAiSearch);
 
     partial void OnUseAiSearchChanged(bool value)
     {
         if (value)
         {
             StartAiPreparation();
+            PublishAiPreparationState();
         }
-        else
+        else if (!IsSearching)
         {
-            _aiPreparationCancellationSource?.Cancel();
+            HideAiPreparationState();
         }
     }
 
@@ -243,6 +249,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         _searchCancellationSource?.Cancel();
     }
 
+    public void StartBackgroundAiPreparation()
+    {
+        StartAiPreparation();
+    }
+
     [RelayCommand]
     private void OpenDetails(SessionSearchResultViewModel? result)
     {
@@ -314,16 +325,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         _aiPreparationCancellationSource?.Dispose();
         _aiPreparationCancellationSource =
             new CancellationTokenSource();
+        _latestAiPreparationProgress = null;
+        _aiPreparationStatusText =
+            "Preparing the local AI search index...";
+        _aiPreparationErrorMessage = null;
         var progress = new Progress<HybridIndexProgress>(
             update =>
             {
-                CompletedSessionCount = update.CompletedSessions;
-                TotalSessionCount = update.TotalSessions;
-                StatusText = update.StatusText;
+                _latestAiPreparationProgress = update;
+                _aiPreparationStatusText = update.StatusText;
+                PublishAiPreparationState();
             });
         _aiPreparationTask = RunAiPreparationAsync(
             progress,
             _aiPreparationCancellationSource);
+        PublishAiPreparationState();
     }
 
     private async Task RunAiPreparationAsync(
@@ -331,8 +347,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         CancellationTokenSource cancellationSource)
     {
         IsPreparingAiSearch = true;
-        ErrorMessage = null;
-        StatusText = "Preparing the local AI search index...";
+        PublishAiPreparationState();
 
         try
         {
@@ -340,27 +355,29 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 .PrepareAiSearchAsync(
                     progress,
                     cancellationSource.Token);
-            StatusText =
+            _aiPreparationStatusText =
                 $"Local AI index ready: {metrics.Blocks:N0} blocks, " +
                 $"{metrics.UpdatedSessions:N0} updated session(s).";
             if (metrics.Failures.Count > 0)
             {
-                ErrorMessage =
+                _aiPreparationErrorMessage =
                     $"{metrics.Failures.Count:N0} session(s) could not be indexed. " +
                     $"Latest: {metrics.Failures[^1].Session.Name}: " +
                     metrics.Failures[^1].Message;
             }
+            PublishAiPreparationState();
         }
         catch (OperationCanceledException)
             when (cancellationSource.IsCancellationRequested)
         {
-            StatusText = "Local AI index preparation canceled.";
         }
         catch (Exception ex)
         {
-            ErrorMessage =
+            _aiPreparationErrorMessage =
                 $"Unable to prepare the local AI search index: {ex.Message}";
-            StatusText = "The local AI search index is unavailable.";
+            _aiPreparationStatusText =
+                "The local AI search index is unavailable.";
+            PublishAiPreparationState();
         }
         finally
         {
@@ -374,6 +391,65 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             cancellationSource.Dispose();
             IsPreparingAiSearch = false;
         }
+    }
+
+    private async Task PauseAiPreparationAsync()
+    {
+        CancellationTokenSource? cancellationSource =
+            _aiPreparationCancellationSource;
+        Task preparationTask = _aiPreparationTask;
+        if (cancellationSource is null
+            || preparationTask.IsCompleted)
+        {
+            return;
+        }
+
+        cancellationSource.Cancel();
+        try
+        {
+            await preparationTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private bool ShouldPublishAiPreparationState()
+    {
+        return UseAiSearch
+            && !IsSearching
+            && !_disposed;
+    }
+
+    private void PublishAiPreparationState()
+    {
+        if (!ShouldPublishAiPreparationState())
+        {
+            return;
+        }
+
+        if (_latestAiPreparationProgress is HybridIndexProgress progress)
+        {
+            CompletedSessionCount = progress.CompletedSessions;
+            TotalSessionCount = progress.TotalSessions;
+        }
+
+        StatusText = _aiPreparationStatusText
+            ?? "Preparing the local AI search index...";
+        ErrorMessage = _aiPreparationErrorMessage;
+        _isAiPreparationStatePublished = true;
+    }
+
+    private void HideAiPreparationState()
+    {
+        if (!_isAiPreparationStatePublished)
+        {
+            return;
+        }
+
+        StatusText = "Enter text to search local Copilot sessions.";
+        ErrorMessage = null;
+        _isAiPreparationStatePublished = false;
     }
 
     private async Task RunSearchAsync(
@@ -390,10 +466,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         UpdateProgress(_latestProgress);
         IsProgressIndeterminate = false;
         StatusText = "Loading the session list...";
+        _isAiPreparationStatePublished = false;
         string? lastStageStatus = null;
 
         try
         {
+            if (!options.UseAiSearch)
+            {
+                await PauseAiPreparationAsync();
+            }
+
             await foreach (SessionSearchUpdate update in _searchCoordinator.SearchAsync(
                 query,
                 options,
@@ -458,6 +540,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
             IsProgressIndeterminate = false;
             IsSearching = false;
+            if (!options.UseAiSearch && !_disposed)
+            {
+                StartAiPreparation();
+            }
         }
     }
 

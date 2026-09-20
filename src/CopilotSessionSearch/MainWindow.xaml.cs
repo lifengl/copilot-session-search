@@ -45,6 +45,7 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _viewModel.StartBackgroundAiPreparation();
         SearchTextBox.Focus();
     }
 

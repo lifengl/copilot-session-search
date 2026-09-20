@@ -14,6 +14,9 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
         "copilot-session-search-ai-";
 
     private readonly CopilotClient _client;
+    private readonly CancellationTokenSource
+        _clientLifetimeCancellationSource = new();
+    private readonly SharedClientStartup _clientStartup;
     private readonly SemaphoreSlim _sessionListGate = new(1, 1);
     private IReadOnlyList<SessionDescriptor>? _sessionSnapshot;
     private bool _disposed;
@@ -32,6 +35,11 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
             {
                 BaseDirectory = copilotHome,
             });
+        _clientStartup = new SharedClientStartup(
+            cancellationToken =>
+                _client.StartAsync(cancellationToken),
+            _client.StopAsync,
+            _clientLifetimeCancellationSource.Token);
     }
 
     public async Task<IReadOnlyList<SessionDescriptor>> GetSessionsAsync(
@@ -52,7 +60,8 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
                 return _sessionSnapshot;
             }
 
-            await _client.StartAsync(cancellationToken).ConfigureAwait(false);
+            await _clientStartup.WaitAsync(
+                cancellationToken).ConfigureAwait(false);
             IList<SessionMetadata> sessions = await _client.ListSessionsAsync(
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -131,8 +140,16 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
         }
 
         _disposed = true;
+        _clientLifetimeCancellationSource.Cancel();
         _sessionListGate.Dispose();
-        await _client.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await _client.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _clientLifetimeCancellationSource.Dispose();
+        }
     }
 
     private static SessionDescriptor CreateDescriptor(SessionMetadata session)
