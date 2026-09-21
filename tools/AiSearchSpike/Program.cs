@@ -32,13 +32,8 @@ try
     await using var historySource = new CopilotSdkSessionHistorySource();
     IReadOnlyList<SessionDescriptor> sessions =
         await historySource.GetSessionsAsync(cancellationSource.Token);
-    IReadOnlyList<SessionDescriptor> eligibleSessions =
-        AiSearchPolicy.FilterEligibleSessions(
-            sessions,
-            DateTimeOffset.UtcNow);
     Console.WriteLine(
-        $"Captured {sessions.Count:N0} local sessions; " +
-        $"{eligibleSessions.Count:N0} are older than the AI-search recency cutoff.");
+        $"Captured {sessions.Count:N0} local sessions.");
 
     string repositoryRoot = Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -69,7 +64,7 @@ try
     RetrievalResult retrieval = await LocalAiCandidateRetriever.RetrieveAsync(
         historySource,
         new SessionDocumentCache(),
-        eligibleSessions,
+        sessions,
         plan,
         progress: (completed, total, _) =>
         {

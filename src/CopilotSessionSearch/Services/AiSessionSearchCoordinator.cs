@@ -53,13 +53,9 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         ArgumentNullException.ThrowIfNull(options);
 
-        IReadOnlyList<SessionDescriptor> availableSessions = await _historySource
+        IReadOnlyList<SessionDescriptor> sessions = await _historySource
             .GetSessionsAsync(cancellationToken)
             .ConfigureAwait(false);
-        IReadOnlyList<SessionDescriptor> sessions =
-            AiSearchPolicy.FilterEligibleSessions(
-                availableSessions,
-                DateTimeOffset.UtcNow);
         var progress = new SessionSearchProgress(
             CompletedSessions: 0,
             TotalSessions: sessions.Count,

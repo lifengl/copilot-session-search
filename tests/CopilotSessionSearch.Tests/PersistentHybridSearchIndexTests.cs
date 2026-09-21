@@ -435,6 +435,54 @@ public sealed class PersistentHybridSearchIndexTests
                     StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task RecentActivityDoesNotRemoveLongRunningSession()
+    {
+        using var workspace = new TemporaryDirectory();
+        string databasePath = Path.Combine(
+            workspace.Path,
+            "index.sqlite");
+        SessionDescriptor originalDescriptor =
+            CreateDescriptor();
+        SessionDescriptor recentlyActiveDescriptor =
+            originalDescriptor with
+            {
+                ModifiedTime = DateTimeOffset.UtcNow,
+            };
+        using var index =
+            new PersistentHybridSearchIndex(databasePath);
+        await index.PrepareAsync(
+            new SingleDocumentHistorySource(
+                CreateDocument(
+                    originalDescriptor,
+                    "Original needle evidence.")),
+            new SessionDocumentCache(),
+            progress: null,
+            CancellationToken.None);
+
+        await index.PrepareAsync(
+            new SingleDocumentHistorySource(
+                CreateDocument(
+                    recentlyActiveDescriptor,
+                    "Updated needle evidence.")),
+            new SessionDocumentCache(),
+            progress: null,
+            CancellationToken.None);
+        HybridQueryResult result = index.Search(
+            "needle",
+            maximumResults: 10);
+
+        HybridRankedBlock match = Assert.Single(
+            result.HybridResults);
+        Assert.Equal(
+            originalDescriptor.SessionId,
+            match.Block.SessionId);
+        Assert.Contains(
+            "Updated needle evidence.",
+            match.Block.Text,
+            StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("C#")]
     [InlineData("C++")]

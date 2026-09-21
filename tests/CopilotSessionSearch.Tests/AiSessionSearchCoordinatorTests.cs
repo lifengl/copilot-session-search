@@ -83,6 +83,49 @@ public sealed class AiSessionSearchCoordinatorTests
     }
 
     [Fact]
+    public async Task SearchIncludesRecentlyActiveLongRunningSession()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "recent",
+            "Recently active session",
+            day: 1) with
+        {
+            ModifiedTime = DateTimeOffset.UtcNow,
+        };
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Useful recent evidence.")]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find useful recent evidence",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal(descriptor.SessionId, result.Session.SessionId);
+    }
+
+    [Fact]
     public async Task SearchFallsBackToLocalRankingWhenRerankerIsCanceledInternally()
     {
         SessionDescriptor descriptor = CreateDescriptor(

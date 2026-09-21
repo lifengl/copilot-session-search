@@ -68,10 +68,9 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
             _sessionSnapshot = sessions
                 .Where(
                     session =>
-                        !session.IsRemote
-                        && !session.SessionId.StartsWith(
-                            AiSearchSessionPrefix,
-                            StringComparison.Ordinal))
+                        ShouldIncludeSession(
+                            session.SessionId,
+                            session.IsRemote))
                 .Select(CreateDescriptor)
                 .OrderByDescending(session => session.ModifiedTime)
                 .ToArray();
@@ -82,6 +81,16 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
         {
             _sessionListGate.Release();
         }
+    }
+
+    internal static bool ShouldIncludeSession(
+        string sessionId,
+        bool isRemote)
+    {
+        return !isRemote
+            && !sessionId.StartsWith(
+                AiSearchSessionPrefix,
+                StringComparison.Ordinal);
     }
 
 #pragma warning disable GHCP001

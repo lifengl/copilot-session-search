@@ -68,14 +68,10 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             .ConfigureAwait(false);
         try
         {
-            IReadOnlyList<SessionDescriptor> availableSessions =
+            IReadOnlyList<SessionDescriptor> sessions =
                 await historySource
                     .GetSessionsAsync(cancellationToken)
                     .ConfigureAwait(false);
-            IReadOnlyList<SessionDescriptor> sessions =
-                AiSearchPolicy.FilterEligibleSessions(
-                    availableSessions,
-                    DateTimeOffset.UtcNow);
             var stopwatch = Stopwatch.StartNew();
             string? databaseDirectory = Path.GetDirectoryName(_databasePath);
             if (!string.IsNullOrWhiteSpace(databaseDirectory))
