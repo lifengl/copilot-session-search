@@ -83,6 +83,53 @@ public sealed class AiSessionSearchCoordinatorTests
     }
 
     [Fact]
+    public async Task SearchFallsBackToLocalRankingWhenRerankerIsCanceledInternally()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Measured ClrMD comparison.")]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankingException = new OperationCanceledException(
+                "The reranker timed out."),
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find a comparison",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal("local", result.AiRelevance?.Confidence);
+        Assert.Contains(
+            updates,
+            update => update.WarningMessage?.Contains(
+                "reranker timed out",
+                StringComparison.OrdinalIgnoreCase) is true);
+        Assert.True(aiSession.WasDisposed);
+    }
+
+    [Fact]
     public async Task SearchSendsAtMostTwentyFourCandidatesToReranker()
     {
         SessionDescriptor[] descriptors = Enumerable
@@ -270,6 +317,70 @@ public sealed class AiSessionSearchCoordinatorTests
             update => update.WarningMessage?.Contains(
                 "Copilot is unavailable",
                 StringComparison.Ordinal) is true);
+    }
+
+    [Fact]
+    public async Task SearchSkipsCandidateSessionCanceledByInternalTimeout()
+    {
+        SessionDescriptor readable = CreateDescriptor(
+            "readable",
+            "Readable",
+            day: 1);
+        SessionDescriptor canceled = CreateDescriptor(
+            "canceled",
+            "Canceled",
+            day: 2);
+        var historySource = new FakeHistorySource(
+            [
+                CreateDocument(readable, "Useful evidence."),
+                CreateDocument(canceled, "Unavailable evidence."),
+            ],
+            internallyCanceledSessionIds: [canceled.SessionId]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [
+                    CreateHybridResult(
+                        canceled,
+                        messageNumber: 1,
+                        score: 0.9),
+                    CreateHybridResult(
+                        readable,
+                        messageNumber: 1,
+                        score: 0.8),
+                ]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find useful evidence",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal(readable.SessionId, result.Session.SessionId);
+        Assert.Contains(
+            updates,
+            update =>
+                update.Failure?.Session.SessionId == canceled.SessionId
+                && update.Failure.Message.Contains(
+                    "timed out",
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -548,15 +659,20 @@ public sealed class AiSessionSearchCoordinatorTests
     private sealed class FakeHistorySource : ISessionHistorySource
     {
         private readonly IReadOnlyList<SessionDocument> _documents;
+        private readonly HashSet<string> _internallyCanceledSessionIds;
         private readonly HashSet<string> _unreadableSessionIds;
 
         public FakeHistorySource(
             IReadOnlyList<SessionDocument> documents,
-            IEnumerable<string>? unreadableSessionIds = null)
+            IEnumerable<string>? unreadableSessionIds = null,
+            IEnumerable<string>? internallyCanceledSessionIds = null)
         {
             _documents = documents;
             _unreadableSessionIds = new HashSet<string>(
                 unreadableSessionIds ?? [],
+                StringComparer.Ordinal);
+            _internallyCanceledSessionIds = new HashSet<string>(
+                internallyCanceledSessionIds ?? [],
                 StringComparer.Ordinal);
         }
 
@@ -573,6 +689,13 @@ public sealed class AiSessionSearchCoordinatorTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_internallyCanceledSessionIds.Contains(
+                session.SessionId))
+            {
+                throw new OperationCanceledException(
+                    "The session read timed out.");
+            }
+
             if (_unreadableSessionIds.Contains(
                 session.SessionId))
             {
@@ -637,6 +760,8 @@ public sealed class AiSessionSearchCoordinatorTests
 
         public bool FailWhileRanking { get; init; }
 
+        public Exception? RankingException { get; init; }
+
         public bool RankCandidatesInInputOrder { get; init; }
 
         public bool ReturnEmptyRanking { get; init; }
@@ -700,6 +825,11 @@ public sealed class AiSessionSearchCoordinatorTests
                 await Task.Delay(
                     Timeout.InfiniteTimeSpan,
                     cancellationToken);
+            }
+
+            if (RankingException is not null)
+            {
+                throw RankingException;
             }
 
             if (FailWhileRanking)

@@ -144,7 +144,8 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                         .ConfigureAwait(false);
             }
             catch (Exception ex) when (
-                ex is not OperationCanceledException)
+                ex is not OperationCanceledException
+                || !cancellationToken.IsCancellationRequested)
             {
                 readFailure = new SessionSearchFailure(
                     session,
@@ -216,7 +217,9 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 cancellationToken).ConfigureAwait(false);
             usage = aiSession.GetUsage();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException
+            || !cancellationToken.IsCancellationRequested)
         {
             rerankingWarning =
                 "Copilot reranking failed; showing local hybrid ranking: " +

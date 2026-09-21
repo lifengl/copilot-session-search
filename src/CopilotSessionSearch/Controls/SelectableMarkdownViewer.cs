@@ -4,6 +4,7 @@ using System.Collections;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -636,10 +637,26 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
             TextSearchPattern pattern = TextSearchPattern.Create(
                 highlightText,
                 options);
+            var matchesByRun =
+                new List<(Run Run, IReadOnlyList<TextMatch> Matches)>(runs.Count);
 
-            foreach (Run run in runs)
+            try
             {
-                HighlightRun(run, pattern);
+                foreach (Run run in runs)
+                {
+                    matchesByRun.Add((
+                        run,
+                        pattern.FindMatches(run.Text)));
+                }
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return;
+            }
+
+            foreach ((Run run, IReadOnlyList<TextMatch> matches) in matchesByRun)
+            {
+                HighlightRun(run, matches);
             }
         }
     }
@@ -666,11 +683,8 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 
     private static void HighlightRun(
         Run run,
-        TextSearchPattern pattern)
+        IReadOnlyList<TextMatch> matches)
     {
-        string text = run.Text;
-        IReadOnlyList<TextMatch> matches = pattern.FindMatches(text);
-
         for (int index = matches.Count - 1; index >= 0; index--)
         {
             TextMatch match = matches[index];

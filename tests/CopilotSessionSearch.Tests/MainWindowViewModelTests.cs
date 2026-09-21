@@ -393,6 +393,44 @@ public sealed class MainWindowViewModelTests
         await viewModel.DisposeAsync();
     }
 
+    [Fact]
+    public async Task InternalCancellationIsReportedAsSearchFailure()
+    {
+        var historySource = new DelayedHistorySource(
+            [],
+            new Dictionary<string, TimeSpan>());
+        var viewModel = new MainWindowViewModel(
+            new SessionSearchCoordinator(
+                historySource,
+                new SessionDocumentCache(),
+                new SessionSearchService(),
+                new InternallyCanceledAiSearchCoordinator()),
+            historySource,
+            new RecordingThemeService(),
+            new RecordingThemePreferenceStore())
+        {
+            SearchText = "Find an earlier investigation",
+            UseAiSearch = true,
+        };
+
+        await viewModel.SearchCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsSearching);
+        Assert.Contains(
+            "Couldn't complete the search",
+            viewModel.ErrorMessage,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AI operation timed out",
+            viewModel.ErrorMessage,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            "The search couldn't be completed.",
+            viewModel.StatusText);
+
+        await viewModel.DisposeAsync();
+    }
+
     private static async Task WaitUntilAsync(
         Func<bool> condition,
         TimeSpan timeout)
@@ -745,6 +783,46 @@ public sealed class MainWindowViewModelTests
         public void CompleteReranking()
         {
             _rerankingCompletion.TrySetResult();
+        }
+    }
+
+    private sealed class InternallyCanceledAiSearchCoordinator :
+        IAiSessionSearchCoordinator
+    {
+        public bool IsReady => true;
+
+        public Task<HybridIndexMetrics> PrepareAsync(
+            IProgress<HybridIndexProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
+                new HybridIndexMetrics(
+                    Sessions: 0,
+                    Messages: 0,
+                    Blocks: 0,
+                    EmbeddingBytes: 0,
+                    DatabaseBytes: 0,
+                    UpdatedSessions: 0,
+                    RemovedSessions: 0,
+                    Failures: [],
+                    UpdateTime: TimeSpan.Zero));
+        }
+
+        public async IAsyncEnumerable<SessionSearchUpdate> SearchAsync(
+            string query,
+            SessionSearchOptions options,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(
+                    "The AI operation timed out.");
+            }
+
+            yield break;
         }
     }
 }

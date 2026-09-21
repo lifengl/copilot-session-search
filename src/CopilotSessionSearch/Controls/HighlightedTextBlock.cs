@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -103,7 +104,17 @@ public sealed class HighlightedTextBlock : TextBlock
         TextSearchPattern pattern = TextSearchPattern.Create(
             highlightText,
             options);
-        IReadOnlyList<TextMatch> matches = pattern.FindMatches(sourceText);
+        IReadOnlyList<TextMatch> matches;
+        try
+        {
+            matches = pattern.FindMatches(sourceText);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            Inlines.Add(new Run(sourceText));
+            return;
+        }
+
         int contentStart = 0;
 
         foreach (TextMatch match in matches)

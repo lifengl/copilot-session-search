@@ -399,6 +399,38 @@ public sealed class SelectableMarkdownViewerTests
     }
 
     [Fact]
+    public void ViewerKeepsTextReadableWhenRegularExpressionHighlightingTimesOut()
+    {
+        RunOnSta(
+            () =>
+            {
+                string markdown = new string('a', 50_000) + "c";
+                var viewer = new SelectableMarkdownViewer
+                {
+                    HighlightText = "^(a+)+(?=b)$",
+                    IsCaseSensitive = true,
+                    UseRegularExpression = true,
+                    SourceMarkdown = markdown,
+                };
+                FlowDocument document =
+                    Assert.IsType<FlowDocument>(viewer.Document);
+                string renderedText = new TextRange(
+                    document.ContentStart,
+                    document.ContentEnd).Text;
+
+                Assert.Contains(
+                    markdown,
+                    renderedText,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    EnumerateRuns(document),
+                    run => Equals(
+                        run.Background,
+                        SystemColors.HighlightBrush));
+            });
+    }
+
+    [Fact]
     public void CopyAddsWordCompatibleHtmlAndPreservesExistingFormats()
     {
         RunOnSta(

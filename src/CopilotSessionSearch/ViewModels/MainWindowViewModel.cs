@@ -526,10 +526,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 "Simplify it and try again.";
             StatusText = "The regular-expression search timed out.";
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            ErrorMessage = $"Search failed: {ex.Message}";
-            StatusText = "The search could not be completed.";
+            ErrorMessage =
+                $"Couldn't complete the search. Try again. Details: {ex.Message}";
+            StatusText = "The search couldn't be completed.";
         }
         finally
         {

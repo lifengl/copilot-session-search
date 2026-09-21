@@ -13,6 +13,9 @@ namespace CopilotSessionSearch;
 
 public partial class MainWindow : Window
 {
+    private static readonly TimeSpan ShutdownTimeout =
+        TimeSpan.FromSeconds(5);
+
     private readonly MainWindowViewModel _viewModel;
     private readonly IConsoleLauncher _consoleLauncher;
     private readonly IClipboardService _clipboardService;
@@ -231,7 +234,9 @@ public partial class MainWindow : Window
         try
         {
             _viewModel.OpenDetailsRequested -= ShowDetails;
-            await _viewModel.DisposeAsync();
+            await WaitForShutdownAsync(
+                _viewModel.DisposeAsync().AsTask(),
+                ShutdownTimeout);
         }
         catch (Exception ex)
         {
@@ -248,5 +253,40 @@ public partial class MainWindow : Window
                 DispatcherPriority.Normal,
                 new Action(Application.Current.Shutdown));
         }
+    }
+
+    internal static async Task<bool> WaitForShutdownAsync(
+        Task shutdownTask,
+        TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(shutdownTask);
+
+        using var timeoutCancellationSource =
+            new CancellationTokenSource();
+        Task timeoutTask = Task.Delay(
+            timeout,
+            timeoutCancellationSource.Token);
+        Task completedTask = await Task.WhenAny(
+            shutdownTask,
+            timeoutTask);
+        if (ReferenceEquals(completedTask, shutdownTask))
+        {
+            timeoutCancellationSource.Cancel();
+            await shutdownTask;
+            return true;
+        }
+
+        _ = shutdownTask.ContinueWith(
+            static completedShutdownTask =>
+            {
+                if (completedShutdownTask.IsFaulted)
+                {
+                    _ = completedShutdownTask.Exception;
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        return false;
     }
 }
