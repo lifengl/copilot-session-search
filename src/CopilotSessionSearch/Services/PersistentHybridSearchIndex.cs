@@ -12,7 +12,7 @@ namespace CopilotSessionSearch.Services;
 public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
 {
     private const string SchemaVersion = "1";
-    private const string ParserVersion = "visible-messages-v1";
+    private const string ParserVersion = "visible-messages-v2";
     private const string ChunkerVersion = "message-markdown-v1";
     private const string RetrievalTextVersion = "neighbors-v1";
     private const string FtsVersion = "unicode61-trigram-v1";

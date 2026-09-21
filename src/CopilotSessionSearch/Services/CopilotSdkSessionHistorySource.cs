@@ -177,7 +177,7 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
             session.Context?.Branch);
     }
 
-    private static void AddConversationEntries(
+    internal static void AddConversationEntries(
         IEnumerable<SessionEvent> events,
         ICollection<ConversationEntry> entries)
     {
@@ -203,6 +203,31 @@ public sealed class CopilotSdkSessionHistorySource : ISessionHistorySource
                             ConversationSpeaker.Copilot,
                             assistantMessage.Timestamp,
                             assistantMessage.Data.Content));
+                    break;
+
+                case SessionTaskCompleteEvent taskComplete
+                    when taskComplete.AgentId is null
+                    && !string.IsNullOrWhiteSpace(
+                        taskComplete.Data.Summary):
+                    string summary = taskComplete.Data.Summary;
+                    ConversationEntry? previousEntry =
+                        entries.LastOrDefault();
+                    if (previousEntry is null
+                        || previousEntry.Speaker
+                            != ConversationSpeaker.Copilot
+                        || !string.Equals(
+                            previousEntry.Content,
+                            summary,
+                            StringComparison.Ordinal))
+                    {
+                        entries.Add(
+                            new ConversationEntry(
+                                taskComplete.Id.ToString("D"),
+                                ConversationSpeaker.Copilot,
+                                taskComplete.Timestamp,
+                                summary));
+                    }
+
                     break;
             }
         }
