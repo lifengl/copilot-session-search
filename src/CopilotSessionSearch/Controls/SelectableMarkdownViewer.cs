@@ -559,11 +559,8 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
                         Source = this,
                     });
 
-                object localBackground = textElement.ReadLocalValue(
-                    TextElement.BackgroundProperty);
                 if (isCodeSpan
-                    || (localBackground != DependencyProperty.UnsetValue
-                        && localBackground is not null))
+                    || HasVisibleBackground(textElement.Background))
                 {
                     textElement.Background = subtleBackground;
                 }
@@ -722,6 +719,13 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;
+    }
+
+    private static bool HasVisibleBackground(Brush? background)
+    {
+        return background is not null
+            && (background is not SolidColorBrush solidColorBrush
+                || solidColorBrush.Color.A > 0);
     }
 
     private static bool IsLightForeground(Brush foreground)

@@ -315,6 +315,51 @@ public sealed class SelectableMarkdownViewerTests
     }
 
     [Fact]
+    public void ViewerNormalizesStyledNotificationBackgroundForDarkMode()
+    {
+        RunOnSta(
+            () =>
+            {
+                const string markdown =
+                    """
+                    <system_notification>
+                    Background agent completed successfully.
+                    </system_notification>
+                    """;
+                var viewer = new SelectableMarkdownViewer
+                {
+                    Background = Brushes.Black,
+                    Foreground = Brushes.White,
+                    SourceMarkdown = markdown,
+                };
+                FlowDocument document =
+                    Assert.IsType<FlowDocument>(viewer.Document);
+                Paragraph[] notificationMarkers =
+                    EnumerateElements<Paragraph>(document)
+                        .Where(
+                            paragraph => string.Equals(
+                                paragraph.Tag as string,
+                                "Note",
+                                StringComparison.Ordinal))
+                        .ToArray();
+
+                Assert.NotEmpty(notificationMarkers);
+                Assert.All(
+                    notificationMarkers,
+                    paragraph =>
+                    {
+                        Assert.Equal(
+                            Brushes.White,
+                            paragraph.Foreground);
+                        Assert.InRange(
+                            GetAlpha(paragraph.Background),
+                            (byte)1,
+                            (byte)24);
+                    });
+            });
+    }
+
+    [Fact]
     public void ViewerRendersSelectableMarkdownAndHighlightsSearchText()
     {
         RunOnSta(

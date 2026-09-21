@@ -119,10 +119,9 @@
                                              IsTabStop="False"
                                              IsToolBarVisible="False"
                                              MatchWholeWord="{Binding MatchWholeWord, Mode=OneTime}"
-                                             MaxHeight="620"
                                              SourceMarkdown="{Binding MarkdownText, Mode=OneTime}"
                                              UseRegularExpression="{Binding UseRegularExpression, Mode=OneTime}"
-                                             VerticalScrollBarVisibility="Auto">
+                                             VerticalScrollBarVisibility="Disabled">
             <controls:SelectableMarkdownViewer.Style>
               <Style TargetType="{x:Type controls:SelectableMarkdownViewer}">
                 <Setter Property="MinHeight" Value="72" />
