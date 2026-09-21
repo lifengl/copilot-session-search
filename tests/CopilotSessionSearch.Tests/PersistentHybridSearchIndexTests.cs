@@ -483,6 +483,79 @@ public sealed class PersistentHybridSearchIndexTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DiversificationRelaxesForDominantSession()
+    {
+        HybridRankedBlock[] ordered =
+        [
+            .. Enumerable.Range(1, 20)
+                .Select(
+                    messageNumber => CreateRankedBlock(
+                        "dominant",
+                        messageNumber,
+                        100 - messageNumber)),
+            .. Enumerable.Range(1, 20)
+                .Select(
+                    index => CreateRankedBlock(
+                        $"other-{index}",
+                        messageNumber: 1,
+                        score: 50 - index)),
+        ];
+
+        IReadOnlyList<HybridRankedBlock> selected =
+            PersistentHybridSearchIndex
+                .SelectDiversifiedResults(
+                    ordered,
+                    maximumResults: 24);
+
+        Assert.Equal(24, selected.Count);
+        HybridRankedBlock[] dominant = selected
+            .Where(
+                result =>
+                    result.Block.SessionId
+                    == "dominant")
+            .ToArray();
+        Assert.Equal(16, dominant.Length);
+        Assert.Equal(
+            Enumerable.Range(1, 16),
+            dominant.Select(
+                result =>
+                    result.Block.MessageNumber));
+    }
+
+    [Fact]
+    public void DiversificationKeepsDefaultLimitWithoutDominance()
+    {
+        HybridRankedBlock[] ordered =
+        [
+            .. Enumerable.Range(1, 6)
+                .Select(
+                    messageNumber => CreateRankedBlock(
+                        "frequent",
+                        messageNumber,
+                        100 - messageNumber)),
+            .. Enumerable.Range(1, 24)
+                .Select(
+                    index => CreateRankedBlock(
+                        $"other-{index}",
+                        messageNumber: 1,
+                        score: 80 - index)),
+        ];
+
+        IReadOnlyList<HybridRankedBlock> selected =
+            PersistentHybridSearchIndex
+                .SelectDiversifiedResults(
+                    ordered,
+                    maximumResults: 24);
+
+        Assert.Equal(
+            5,
+            selected.Count(
+                result =>
+                    result.Block.SessionId
+                    == "frequent"));
+    }
+
     [Theory]
     [InlineData("C#")]
     [InlineData("C++")]
@@ -929,6 +1002,33 @@ public sealed class PersistentHybridSearchIndexTests
                     descriptor.StartTime,
                     text),
             ]);
+    }
+
+    private static HybridRankedBlock CreateRankedBlock(
+        string sessionId,
+        int messageNumber,
+        double score)
+    {
+        return new HybridRankedBlock(
+            new HybridSearchBlock(
+                messageNumber,
+                sessionId,
+                $"Session {sessionId}",
+                DateTimeOffset.Parse(
+                    "2026-01-01T11:00:00Z"),
+                messageNumber,
+                ChunkNumber: 1,
+                Speaker: "Copilot",
+                Text: $"Evidence {messageNumber}",
+                RetrievalText: string.Empty,
+                Embedding: []),
+            score,
+            WordRank: messageNumber,
+            TrigramRank: null,
+            EmbeddingRank: null,
+            ExactRank: null,
+            EmbeddingSimilarity: null,
+            ExactScore: 0);
     }
 
     private static async Task WaitUntilAsync(

@@ -49,7 +49,8 @@ public sealed class AiRankingItem
 public sealed record CandidateEvidence(
     int MessageNumber,
     string Speaker,
-    string Text);
+    string Text,
+    bool IsPreferredAnswer = false);
 
 public sealed record AiLocalMatchSignals(
     int RequiredGroupsMatched,

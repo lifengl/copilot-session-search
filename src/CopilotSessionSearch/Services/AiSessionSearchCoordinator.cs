@@ -8,7 +8,7 @@ namespace CopilotSessionSearch.Services;
 
 public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
 {
-    private const int MaximumRerankCandidates = 24;
+    private const int MaximumLocalCandidates = 36;
 
     private readonly ISessionHistorySource _historySource;
     private readonly SessionDocumentCache _documentCache;
@@ -97,7 +97,7 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
         HybridQueryResult localResult = await Task.Run(
             () => _hybridIndex.Search(
                 query,
-                maximumResults: MaximumRerankCandidates,
+                maximumResults: MaximumLocalCandidates,
                 cancellationToken),
             cancellationToken).ConfigureAwait(false);
         if (localResult.HybridResults.Count == 0)
@@ -167,16 +167,10 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
             }
         }
 
-        AiSearchCandidate[] candidates = localResult.HybridResults
-            .Where(
-                result => documentsBySessionId.ContainsKey(
-                    result.Block.SessionId))
-            .Select(
-                (result, index) => CreateCandidate(
-                    result,
-                    documentsBySessionId[result.Block.SessionId],
-                    index))
-            .ToArray();
+        AiSearchCandidate[] candidates = AiSearchCandidateBuilder.Create(
+            query,
+            localResult.HybridResults,
+            documentsBySessionId);
         if (candidates.Length == 0)
         {
             yield return new SessionSearchUpdate(
@@ -191,7 +185,7 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
             null,
             null,
             progress,
-            $"Asking Copilot to rank {candidates.Length:N0} hybrid message blocks...",
+            $"Asking Copilot to rank {candidates.Length:N0} conversation exchanges...",
             IsProgressIndeterminate: true);
 
         List<AiRankingItem> rankings;
@@ -307,43 +301,6 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
             rerankingWarning);
     }
 
-    private static AiSearchCandidate CreateCandidate(
-        HybridRankedBlock result,
-        SessionDocument document,
-        int index)
-    {
-        HybridSearchBlock block = result.Block;
-        int tableRows = block.Text
-            .Split('\n')
-            .Count(
-                line => line.Count(
-                    character => character == '|') >= 2);
-        return new AiSearchCandidate(
-            $"H{index + 1:D3}",
-            block.SessionId,
-            block.SessionName,
-            block.ModifiedTime,
-            result.HybridScore,
-            new AiLocalMatchSignals(
-                RequiredGroupsMatched: 0,
-                RequiredGroupsTotal: 0,
-                PreferredGroupsMatched: 0,
-                PreferredGroupsTotal: 0,
-                ExactPhrasesMatched: 0,
-                DistinctTermsMatched: 0,
-                QuantitativeSignals: 0,
-                MarkdownTableRows: tableRows),
-            [
-                new CandidateEvidence(
-                    block.MessageNumber,
-                    block.Speaker,
-                    block.Text),
-            ])
-        {
-            Document = document,
-        };
-    }
-
     private static SessionSearchResult CreateResult(
         string query,
         SessionSearchOptions options,
@@ -361,11 +318,12 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
 
         foreach (RankedCandidate rankedBlock in rankedBlocks)
         {
-            int[] messageNumbers = rankedBlock.Ranking.MessageNumbers.Count > 0
-                ? rankedBlock.Ranking.MessageNumbers.ToArray()
-                : rankedBlock.Candidate.Evidence
-                    .Select(evidence => evidence.MessageNumber)
-                    .ToArray();
+            int[] messageNumbers =
+                GetPreferredMessageNumbers(
+                    rankedBlock.Candidate,
+                    rankedBlock.Ranking.MessageNumbers.Count > 0
+                        ? rankedBlock.Ranking.MessageNumbers
+                        : null);
             var relevance = new AiRelevanceInfo(
                 rankedBlock.Ranking.Score,
                 rankedBlock.Ranking.Confidence,
@@ -427,12 +385,13 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 bestBlock.Ranking.Reason));
     }
 
-    private static string CreatePreview(string content)
+    private static string CreatePreview(
+        string content,
+        int maximumLength = 1_800)
     {
-        const int MaximumLength = 1_800;
-        return content.Length <= MaximumLength
+        return content.Length <= maximumLength
             ? content
-            : content[..MaximumLength] + "...";
+            : content[..(maximumLength - 3)] + "...";
     }
 
     private static List<AiRankingItem> CreateLocalFallbackRankings(
@@ -444,15 +403,55 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 {
                     CandidateId = candidate.CandidateId,
                     Confidence = "local",
-                    MessageNumbers = candidate.Evidence
-                        .Select(evidence => evidence.MessageNumber)
-                        .ToList(),
+                    MessageNumbers =
+                        GetPreferredMessageNumbers(
+                            candidate)
+                            .ToList(),
                     Reason =
                         "Local hybrid ranking used because Copilot reranking was unavailable.",
                     Score = Math.Max(1, 80 - index * 2),
                 })
             .Take(15)
             .ToList();
+    }
+
+    private static int[] GetPreferredMessageNumbers(
+        AiSearchCandidate candidate,
+        IReadOnlyCollection<int>?
+            selectedMessageNumbers = null)
+    {
+        CandidateEvidence[] selectedEvidence =
+            selectedMessageNumbers is null
+                ? candidate.Evidence.ToArray()
+                : candidate.Evidence
+                    .Where(
+                        evidence =>
+                            selectedMessageNumbers.Contains(
+                                evidence.MessageNumber))
+                    .ToArray();
+        int[] copilotMessages = selectedEvidence
+            .Where(
+                evidence => string.Equals(
+                    evidence.Speaker,
+                    "Copilot",
+                    StringComparison.Ordinal))
+            .OrderByDescending(
+                evidence =>
+                    evidence.IsPreferredAnswer)
+            .ThenBy(
+                evidence =>
+                    evidence.MessageNumber)
+            .Select(
+                evidence => evidence.MessageNumber)
+            .Distinct()
+            .ToArray();
+        return copilotMessages.Length > 0
+            ? copilotMessages
+            : selectedEvidence
+                .Select(
+                    evidence => evidence.MessageNumber)
+                .Distinct()
+                .ToArray();
     }
 
     private static string AppendWarning(
@@ -467,4 +466,5 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
     private sealed record RankedCandidate(
         AiRankingItem Ranking,
         AiSearchCandidate Candidate);
+
 }

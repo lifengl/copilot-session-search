@@ -126,6 +126,178 @@ public sealed class AiSessionSearchCoordinatorTests
     }
 
     [Fact]
+    public async Task SearchGroupsPromptAndCopilotResponseIntoOneCandidate()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "exchange",
+            "Exchange session",
+            day: 1);
+        var document = new SessionDocument(
+            descriptor,
+            [
+                new ConversationEntry(
+                    "user-prompt",
+                    ConversationSpeaker.User,
+                    descriptor.StartTime,
+                    "Recommend a sample rate for Canary."),
+                new ConversationEntry(
+                    "copilot-progress",
+                    ConversationSpeaker.Copilot,
+                    descriptor.StartTime.AddMinutes(1),
+                    "I am checking the channel data."),
+                new ConversationEntry(
+                    "copilot-answer",
+                    ConversationSpeaker.Copilot,
+                    descriptor.StartTime.AddMinutes(2),
+                    "Use a 20% Canary sample rate based on the measured volume."),
+                new ConversationEntry(
+                    "next-user-prompt",
+                    ConversationSpeaker.User,
+                    descriptor.StartTime.AddMinutes(3),
+                    "Now investigate a different topic."),
+            ]);
+        var historySource = new FakeHistorySource([document]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [
+                    CreateHybridResult(
+                        descriptor,
+                        messageNumber: 1,
+                        score: 0.9,
+                        text:
+                            "Recommend a sample rate for Canary."),
+                    CreateHybridResult(
+                        descriptor,
+                        messageNumber: 3,
+                        score: 0.8,
+                        text:
+                            "Use a 20% Canary sample rate based on the measured volume."),
+                ]),
+            new FakeAiSearchSessionFactory(aiSession));
+
+        var updates = new List<SessionSearchUpdate>();
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "recommend sample rate in canary",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        AiSearchCandidate candidate = Assert.Single(
+            aiSession.ReceivedCandidates);
+        Assert.Equal(
+            [1, 2, 3],
+            candidate.Evidence
+                .Select(evidence => evidence.MessageNumber));
+        Assert.Contains(
+            candidate.Evidence,
+            evidence =>
+                evidence.Speaker == "Copilot"
+                && evidence.Text.Contains(
+                    "20% Canary sample rate",
+                    StringComparison.Ordinal));
+        Assert.False(
+            candidate.Evidence.Single(
+                evidence =>
+                    evidence.MessageNumber == 2)
+                .IsPreferredAnswer);
+        Assert.True(
+            candidate.Evidence.Single(
+                evidence =>
+                    evidence.MessageNumber == 3)
+                .IsPreferredAnswer);
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal(2, result.Sections.Count);
+        Assert.All(
+            result.Sections,
+            section => Assert.Equal(
+                ConversationSpeaker.Copilot,
+                section.Speaker));
+        MatchSection section = result.Sections[0];
+        Assert.Contains(
+            "20% Canary sample rate",
+            section.FullText,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SearchPreservesMatchedChunkFromLongCopilotAnswer()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "long-answer",
+            "Long answer",
+            day: 1);
+        const string directAnswer =
+            "Use a 20% Canary sample rate.";
+        var document = new SessionDocument(
+            descriptor,
+            [
+                new ConversationEntry(
+                    "prompt",
+                    ConversationSpeaker.User,
+                    descriptor.StartTime,
+                    "Recommend a Canary sample rate."),
+                new ConversationEntry(
+                    "answer",
+                    ConversationSpeaker.Copilot,
+                    descriptor.StartTime.AddMinutes(1),
+                    new string('x', 2_000)
+                        + directAnswer),
+            ]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            new FakeHistorySource([document]),
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [
+                    CreateHybridResult(
+                        descriptor,
+                        messageNumber: 2,
+                        score: 0.9,
+                        text: directAnswer),
+                ]),
+            new FakeAiSearchSessionFactory(aiSession));
+
+        await foreach (SessionSearchUpdate _ in coordinator.SearchAsync(
+            "recommend canary sample rate",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+        }
+
+        AiSearchCandidate candidate = Assert.Single(
+            aiSession.ReceivedCandidates);
+        CandidateEvidence answer = Assert.Single(
+            candidate.Evidence,
+            evidence => evidence.MessageNumber == 2);
+        Assert.Contains(
+            directAnswer,
+            answer.Text,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SearchFallsBackToLocalRankingWhenRerankerIsCanceledInternally()
     {
         SessionDescriptor descriptor = CreateDescriptor(
@@ -224,7 +396,7 @@ public sealed class AiSessionSearchCoordinatorTests
         Assert.Contains(
             updates,
             update => update.StatusText ==
-                "Asking Copilot to rank 24 hybrid message blocks..."
+                "Asking Copilot to rank 24 conversation exchanges..."
                 && update.IsProgressIndeterminate);
         Assert.False(updates[^1].IsProgressIndeterminate);
     }
@@ -317,6 +489,63 @@ public sealed class AiSessionSearchCoordinatorTests
                 "showing local hybrid ranking",
                 StringComparison.OrdinalIgnoreCase) is true);
         Assert.True(aiSession.WasDisposed);
+    }
+
+    [Fact]
+    public async Task LocalFallbackReturnsCopilotAnswerInsteadOfPrompt()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var document = new SessionDocument(
+            descriptor,
+            [
+                new ConversationEntry(
+                    "prompt",
+                    ConversationSpeaker.User,
+                    descriptor.StartTime,
+                    "Recommend a Canary sample rate."),
+                new ConversationEntry(
+                    "answer",
+                    ConversationSpeaker.Copilot,
+                    descriptor.StartTime.AddMinutes(1),
+                    "Use a 20% Canary sample rate."),
+            ]);
+        var aiSession = new FakeAiSearchSession
+        {
+            FailWhileRanking = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            new FakeHistorySource([document]),
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "recommend canary sample rate",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        MatchSection section = Assert.Single(result.Sections);
+        Assert.Equal(ConversationSpeaker.Copilot, section.Speaker);
+        Assert.Contains(
+            "20% Canary sample rate",
+            section.FullText,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -675,7 +904,8 @@ public sealed class AiSessionSearchCoordinatorTests
     private static HybridRankedBlock CreateHybridResult(
         SessionDescriptor descriptor,
         int messageNumber,
-        double score)
+        double score,
+        string? text = null)
     {
         var block = new HybridSearchBlock(
             messageNumber,
@@ -685,7 +915,8 @@ public sealed class AiSessionSearchCoordinatorTests
             messageNumber,
             ChunkNumber: 1,
             Speaker: "Copilot",
-            Text: $"Evidence from message {messageNumber}.",
+            Text: text
+                ?? $"Evidence from message {messageNumber}.",
             RetrievalText: string.Empty,
             Embedding: []);
         return new HybridRankedBlock(

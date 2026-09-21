@@ -349,7 +349,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsProgressIndeterminate);
         Assert.Equal(viewModel.TotalSessionCount, viewModel.CompletedSessionCount);
         Assert.Equal(
-            "Asking Copilot to rank 24 hybrid message blocks...",
+            "Asking Copilot to rank 24 conversation exchanges...",
             viewModel.StatusText);
 
         aiCoordinator.CompleteReranking();
@@ -769,7 +769,7 @@ public sealed class MainWindowViewModelTests
                 null,
                 null,
                 new SessionSearchProgress(10, 10, 0, 0),
-                "Asking Copilot to rank 24 hybrid message blocks...",
+                "Asking Copilot to rank 24 conversation exchanges...",
                 IsProgressIndeterminate: true);
             _rerankingStarted.TrySetResult();
             await _rerankingCompletion.Task.WaitAsync(cancellationToken);

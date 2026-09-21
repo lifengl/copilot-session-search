@@ -20,6 +20,9 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         "bge-micro-v2@72908b7";
     private const string EmbeddingFormatVersion = "i8-384-v1";
     private const int EmbeddingStorageLength = 388;
+    private const int DefaultMaximumResultsPerSession = 5;
+    private const int DominantSessionResultThreshold = 8;
+    private const int MaximumAdaptiveResultsPerSession = 16;
     private const string GenerationMetadataKey = "generation";
     private const string IncarnationMetadataKey = "incarnation";
 
@@ -604,28 +607,9 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             .OrderByDescending(result => result.HybridScore)
             .ThenByDescending(result => result.Block.ModifiedTime)
             .ToArray();
-        var sessionCounts = new Dictionary<string, int>(
-            StringComparer.Ordinal);
-        var results = new List<HybridRankedBlock>();
-
-        foreach (HybridRankedBlock result in ordered)
-        {
-            int sessionCount = sessionCounts.GetValueOrDefault(
-                result.Block.SessionId);
-            if (sessionCount == 5)
-            {
-                continue;
-            }
-
-            sessionCounts[result.Block.SessionId] = sessionCount + 1;
-            results.Add(result);
-            if (results.Count == maximumResults)
-            {
-                break;
-            }
-        }
-
-        return results;
+        return SelectDiversifiedResults(
+            ordered,
+            maximumResults);
 
         void AddChannel(
             IReadOnlyList<ChannelHit> hits,
@@ -651,6 +635,76 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                     hit.Score);
             }
         }
+    }
+
+    internal static IReadOnlyList<HybridRankedBlock>
+        SelectDiversifiedResults(
+            IReadOnlyList<HybridRankedBlock> ordered,
+            int maximumResults)
+    {
+        if (maximumResults <= 0 || ordered.Count == 0)
+        {
+            return [];
+        }
+
+        Dictionary<string, int> naturalSessionCounts = ordered
+            .Take(maximumResults)
+            .GroupBy(
+                result => result.Block.SessionId,
+                StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.Ordinal);
+        Dictionary<string, int> sessionLimits =
+            naturalSessionCounts.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value
+                        >= DominantSessionResultThreshold
+                    ? Math.Min(
+                        pair.Value,
+                        MaximumAdaptiveResultsPerSession)
+                    : DefaultMaximumResultsPerSession,
+                StringComparer.Ordinal);
+        var sessionCounts = new Dictionary<string, int>(
+            StringComparer.Ordinal);
+        var results = new List<HybridRankedBlock>();
+        var deferred = new List<HybridRankedBlock>();
+
+        foreach (HybridRankedBlock result in ordered)
+        {
+            int sessionCount = sessionCounts.GetValueOrDefault(
+                result.Block.SessionId);
+            int sessionLimit = sessionLimits.GetValueOrDefault(
+                result.Block.SessionId,
+                DefaultMaximumResultsPerSession);
+            if (sessionCount == sessionLimit)
+            {
+                deferred.Add(result);
+                continue;
+            }
+
+            sessionCounts[result.Block.SessionId] = sessionCount + 1;
+            results.Add(result);
+            if (results.Count == maximumResults)
+            {
+                break;
+            }
+        }
+
+        if (results.Count < maximumResults)
+        {
+            foreach (HybridRankedBlock result in deferred)
+            {
+                results.Add(result);
+                if (results.Count == maximumResults)
+                {
+                    break;
+                }
+            }
+        }
+
+        return results;
     }
 
     private IReadOnlyList<HybridRankedBlock> CreateSingleChannelResults(
