@@ -168,13 +168,22 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                     totalOperations);
             }
 
-            IReadOnlyDictionary<long, HybridSearchBlock> blocks =
-                await Task.Run(
-                () => LoadBlocks(connection),
-                cancellationToken).ConfigureAwait(false);
             IndexIdentity identity =
                 LoadIndexIdentity(connection);
-            _blocks = blocks;
+            bool reloadBlocks = _blocks.Count == 0
+                || totalOperations > 0
+                || _loadedGeneration != identity.Generation
+                || !string.Equals(
+                    _loadedIncarnation,
+                    identity.Incarnation,
+                    StringComparison.Ordinal);
+            if (reloadBlocks)
+            {
+                _blocks = await Task.Run(
+                    () => LoadBlocks(connection),
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             _loadedGeneration = identity.Generation;
             _loadedIncarnation = identity.Incarnation;
             _isReady = true;
@@ -880,7 +889,6 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                 chunk_number,
                 speaker,
                 body,
-                retrieval_text,
                 embedding
             FROM blocks;
             """;
@@ -902,8 +910,8 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                     reader.GetInt32(5),
                     reader.GetString(6),
                     reader.GetString(7),
-                    reader.GetString(8),
-                    (byte[])reader[9]));
+                    RetrievalText: string.Empty,
+                    Embedding: (byte[])reader[8]));
         }
 
         return blocks;

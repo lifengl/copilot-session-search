@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using System.Xml;
 using CopilotSessionSearch.Controls;
 using CopilotSessionSearch.ViewModels;
+using ICSharpCode.AvalonEdit;
 
 namespace CopilotSessionSearch.Views;
 
@@ -104,6 +105,11 @@ public partial class SessionDetailsWindow : Window
         if (e.Key == Key.C
             && Keyboard.Modifiers == ModifierKeys.Control)
         {
+            if (IsFocusInsideCodeEditor())
+            {
+                return;
+            }
+
             SelectableMarkdownViewer? focusedViewer = GetFocusedMarkdownViewer();
             CopyRenderedContent(
                 focusedViewer ?? GetSelectedMarkdownViewer(),
@@ -124,6 +130,28 @@ public partial class SessionDetailsWindow : Window
                 e.Handled = true;
             }
         }
+    }
+
+    private static bool IsFocusInsideCodeEditor()
+    {
+        return IsInsideCodeEditor(
+            Keyboard.FocusedElement as DependencyObject);
+    }
+
+    internal static bool IsInsideCodeEditor(
+        DependencyObject? current)
+    {
+        while (current is not null)
+        {
+            if (current is TextEditor)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 
     private void CopyWholeMessageButton_Click(object sender, RoutedEventArgs e)

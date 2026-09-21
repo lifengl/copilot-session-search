@@ -141,6 +141,18 @@ public static class WpfXamlToHtmlConverter
         StringBuilder html,
         RenderContext context)
     {
+        if (string.Equals(
+            GetAttribute(element, "Tag"),
+            "CodeBlock",
+            StringComparison.Ordinal))
+        {
+            html.Append(
+                "<pre style=\"margin:0;font-family:Consolas,'Courier New',monospace;white-space:pre-wrap\"><code>");
+            AppendChildren(element, html, context);
+            html.Append("</code></pre>");
+            return;
+        }
+
         string tagName = context.CompactParagraphs
             ? "div"
             : GetParagraphTag(element, context.BaseFontSize);
@@ -350,6 +362,18 @@ public static class WpfXamlToHtmlConverter
         XElement element,
         double baseFontSize)
     {
+        string? semanticTag = GetAttribute(element, "Tag");
+        if (semanticTag is
+            "Heading1"
+            or "Heading2"
+            or "Heading3"
+            or "Heading4"
+            or "Heading5"
+            or "Heading6")
+        {
+            return "h" + semanticTag[^1];
+        }
+
         double fontSize = GetDoubleAttribute(element, "FontSize")
             ?? baseFontSize;
         double ratio = fontSize / baseFontSize;

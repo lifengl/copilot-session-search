@@ -1,7 +1,9 @@
 #nullable enable
 
 using System.Collections;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -202,6 +204,14 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
         DataObjectCopyingEventArgs eventArgs)
     {
         var viewer = (SelectableMarkdownViewer)sender;
+        if (viewer._isCopyingWholeMessage)
+        {
+            SetWholeMessageClipboardFormats(
+                viewer,
+                eventArgs.DataObject);
+            return;
+        }
+
         if (!eventArgs.DataObject.GetDataPresent(
             DataFormats.Html,
             autoConvert: false))
@@ -218,22 +228,225 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
                     autoConvert: false);
             }
         }
+    }
 
-        if (viewer._isCopyingWholeMessage)
+    private static void SetWholeMessageClipboardFormats(
+        SelectableMarkdownViewer viewer,
+        IDataObject dataObject)
+    {
+        string sourceMarkdown =
+            viewer.SourceMarkdown ?? string.Empty;
+        FlowDocument richDocument =
+            CreateSerializableDocument(
+                viewer,
+                sourceMarkdown);
+        string xaml = SaveTextRange(
+            richDocument,
+            DataFormats.Xaml,
+            Encoding.UTF8);
+        string htmlFragment =
+            WpfXamlToHtmlConverter.Convert(xaml);
+        string rtf = SaveTextRange(
+            richDocument,
+            DataFormats.Rtf,
+            Encoding.ASCII);
+
+        dataObject.SetData(
+            DataFormats.Html,
+            HtmlClipboardFormat.Create(htmlFragment),
+            autoConvert: false);
+        dataObject.SetData(
+            DataFormats.Rtf,
+            rtf,
+            autoConvert: false);
+        dataObject.SetData(
+            DataFormats.Xaml,
+            xaml,
+            autoConvert: false);
+        dataObject.SetData(
+            DataFormats.Text,
+            sourceMarkdown,
+            autoConvert: false);
+        dataObject.SetData(
+            DataFormats.UnicodeText,
+            sourceMarkdown,
+            autoConvert: false);
+        dataObject.SetData(
+            DataFormats.StringFormat,
+            sourceMarkdown,
+            autoConvert: false);
+    }
+
+    private static string SaveTextRange(
+        FlowDocument document,
+        string dataFormat,
+        Encoding encoding)
+    {
+        using var stream = new MemoryStream();
+        new TextRange(
+            document.ContentStart,
+            document.ContentEnd).Save(
+                stream,
+                dataFormat);
+        return encoding.GetString(stream.ToArray());
+    }
+
+    private static FlowDocument CreateSerializableDocument(
+        SelectableMarkdownViewer viewer,
+        string sourceMarkdown)
+    {
+        FlowDocument document = viewer.Engine.Transform(
+            MarkdownContentSanitizer.Sanitize(sourceMarkdown));
+        document.FontFamily = viewer.FontFamily;
+        document.FontSize = viewer.FontSize;
+        ApplySerializableHeadingSizes(
+            document.Blocks,
+            viewer.FontSize);
+        ReplaceCodeBlocks(document.Blocks);
+        return document;
+    }
+
+    private static void ApplySerializableHeadingSizes(
+        BlockCollection blocks,
+        double baseFontSize)
+    {
+        foreach (Block block in blocks)
         {
-            string markdown = viewer.SourceMarkdown ?? string.Empty;
-            eventArgs.DataObject.SetData(
-                DataFormats.Text,
-                markdown,
-                autoConvert: false);
-            eventArgs.DataObject.SetData(
-                DataFormats.UnicodeText,
-                markdown,
-                autoConvert: false);
-            eventArgs.DataObject.SetData(
-                DataFormats.StringFormat,
-                markdown,
-                autoConvert: false);
+            if (block is Paragraph paragraph
+                && paragraph.Tag is string tag)
+            {
+                double? scale = tag switch
+                {
+                    "Heading1" => 2,
+                    "Heading2" => 1.6,
+                    "Heading3" => 1.4,
+                    "Heading4" => 1.25,
+                    "Heading5" => 1.1,
+                    _ => null,
+                };
+                if (scale is double headingScale)
+                {
+                    paragraph.FontSize =
+                        baseFontSize * headingScale;
+                }
+                else if (string.Equals(
+                    tag,
+                    "Heading6",
+                    StringComparison.Ordinal))
+                {
+                    paragraph.FontWeight =
+                        FontWeights.Bold;
+                }
+            }
+
+            switch (block)
+            {
+                case Section section:
+                    ApplySerializableHeadingSizes(
+                        section.Blocks,
+                        baseFontSize);
+                    break;
+
+                case List list:
+                    foreach (ListItem item in list.ListItems)
+                    {
+                        ApplySerializableHeadingSizes(
+                            item.Blocks,
+                            baseFontSize);
+                    }
+                    break;
+
+                case Table table:
+                    foreach (TableRowGroup rowGroup
+                        in table.RowGroups)
+                    {
+                        foreach (TableRow row in rowGroup.Rows)
+                        {
+                            foreach (TableCell cell in row.Cells)
+                            {
+                                ApplySerializableHeadingSizes(
+                                    cell.Blocks,
+                                    baseFontSize);
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+    }
+
+    private static void ReplaceCodeBlocks(
+        BlockCollection blocks)
+    {
+        foreach (Block block in blocks.Cast<Block>().ToArray())
+        {
+            switch (block)
+            {
+                case BlockUIContainer container
+                    when container.Child is TextEditor editor:
+                    var paragraph = new Paragraph
+                    {
+                        FontFamily = new FontFamily("Consolas"),
+                        Tag = "CodeBlock",
+                        Margin = new Thickness(0),
+                    };
+                    string[] lines = editor.Text
+                        .Replace(
+                            "\r\n",
+                            "\n",
+                            StringComparison.Ordinal)
+                        .Replace('\r', '\n')
+                        .Split('\n');
+                    for (int index = 0;
+                        index < lines.Length;
+                        index++)
+                    {
+                        if (index > 0)
+                        {
+                            paragraph.Inlines.Add(
+                                new LineBreak());
+                        }
+
+                        if (lines[index].Length > 0)
+                        {
+                            paragraph.Inlines.Add(
+                                new Run(lines[index]));
+                        }
+                    }
+
+                    blocks.InsertBefore(
+                        container,
+                        paragraph);
+                    blocks.Remove(container);
+                    break;
+
+                case Section section:
+                    ReplaceCodeBlocks(section.Blocks);
+                    break;
+
+                case List list:
+                    foreach (ListItem item in list.ListItems
+                        .Cast<ListItem>()
+                        .ToArray())
+                    {
+                        ReplaceCodeBlocks(item.Blocks);
+                    }
+                    break;
+
+                case Table table:
+                    foreach (TableRowGroup rowGroup
+                        in table.RowGroups)
+                    {
+                        foreach (TableRow row in rowGroup.Rows)
+                        {
+                            foreach (TableCell cell in row.Cells)
+                            {
+                                ReplaceCodeBlocks(cell.Blocks);
+                            }
+                        }
+                    }
+                    break;
+            }
         }
     }
 

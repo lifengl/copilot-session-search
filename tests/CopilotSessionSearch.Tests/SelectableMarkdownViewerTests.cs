@@ -2,11 +2,14 @@
 
 using System.Collections;
 using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using CopilotSessionSearch.Controls;
+using CopilotSessionSearch.Views;
 using ICSharpCode.AvalonEdit;
 
 namespace CopilotSessionSearch.Tests;
@@ -69,6 +72,10 @@ public sealed class SelectableMarkdownViewerTests
                     | Name | Value |
                     |---|---|
                     | Alpha | One |
+
+                    ```csharp
+                    Verify.Operation(codeToken);
+                    ```
                     """;
                 var viewer = new SelectableMarkdownViewer
                 {
@@ -108,7 +115,100 @@ public sealed class SelectableMarkdownViewerTests
                 Assert.Contains("<h2>Heading</h2>", html, StringComparison.Ordinal);
                 Assert.Contains("<table ", html, StringComparison.Ordinal);
                 Assert.Contains("Alpha", html, StringComparison.Ordinal);
+                Assert.Contains(
+                    "Verify.Operation(codeToken);",
+                    html,
+                    StringComparison.Ordinal);
+                string xaml = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Xaml,
+                        autoConvert: false));
+                Assert.Contains(
+                    "Verify.Operation(codeToken);",
+                    xaml,
+                    StringComparison.Ordinal);
+                string rtf = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Rtf,
+                        autoConvert: false));
+                Assert.Contains(
+                    "Verify.Operation(codeToken);",
+                    rtf,
+                    StringComparison.Ordinal);
                 Assert.Equal("Heading", selection.Text);
+            });
+    }
+
+    [Fact]
+    public void DetailWindowRecognizesFocusInsideCodeEditor()
+    {
+        RunOnSta(
+            () =>
+            {
+                Assert.True(
+                    SessionDetailsWindow.IsInsideCodeEditor(
+                        new TextEditor()));
+                Assert.False(
+                    SessionDetailsWindow.IsInsideCodeEditor(
+                        new TextBlock()));
+            });
+    }
+
+    [Fact]
+    public void CopyWholeMessagePreservesMultilineCodeInsideList()
+    {
+        RunOnSta(
+            () =>
+            {
+                const string markdown =
+                    """
+                    1. Investigation
+
+                       ```csharp
+                       FirstLine();
+                       SecondLine();
+                       ```
+                    """;
+                var viewer = new SelectableMarkdownViewer
+                {
+                    SourceMarkdown = markdown,
+                };
+                PrepareViewer(viewer);
+
+                IDataObject dataObject = CaptureCopyData(
+                    viewer,
+                    viewer.CopyWholeMessage);
+
+                string html = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Html,
+                        autoConvert: false));
+                Assert.Contains(
+                    "FirstLine();<br>SecondLine();",
+                    html,
+                    StringComparison.Ordinal);
+                string rtf = Assert.IsType<string>(
+                    dataObject.GetData(
+                        DataFormats.Rtf,
+                        autoConvert: false));
+                using var stream = new MemoryStream(
+                    Encoding.ASCII.GetBytes(rtf));
+                var document = new FlowDocument();
+                var range = new TextRange(
+                    document.ContentStart,
+                    document.ContentEnd);
+                range.Load(stream, DataFormats.Rtf);
+                string normalized = range.Text
+                    .Replace(
+                        "\r\n",
+                        "\n",
+                        StringComparison.Ordinal)
+                    .Replace('\r', '\n');
+
+                Assert.Contains(
+                    "FirstLine();\nSecondLine();",
+                    normalized,
+                    StringComparison.Ordinal);
             });
     }
 
