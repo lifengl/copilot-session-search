@@ -16,5 +16,6 @@ public interface IHybridSearchIndex : IDisposable
 
     HybridQueryResult Search(
         string query,
-        int maximumResults = 30);
+        int maximumResults = 30,
+        CancellationToken cancellationToken = default);
 }

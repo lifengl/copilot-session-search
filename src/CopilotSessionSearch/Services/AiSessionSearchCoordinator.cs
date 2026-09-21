@@ -98,7 +98,8 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
         HybridQueryResult localResult = await Task.Run(
             () => _hybridIndex.Search(
                 query,
-                maximumResults: MaximumRerankCandidates),
+                maximumResults: MaximumRerankCandidates,
+                cancellationToken),
             cancellationToken).ConfigureAwait(false);
         if (localResult.HybridResults.Count == 0)
         {

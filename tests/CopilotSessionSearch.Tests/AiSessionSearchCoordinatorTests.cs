@@ -514,8 +514,10 @@ public sealed class AiSessionSearchCoordinatorTests
 
         public HybridQueryResult Search(
             string query,
-            int maximumResults = 30)
+            int maximumResults = 30,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return new HybridQueryResult(
                 query,
                 TimeSpan.Zero,

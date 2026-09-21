@@ -19,13 +19,19 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
     private const string EmbeddingModelVersion =
         "bge-micro-v2@72908b7";
     private const string EmbeddingFormatVersion = "i8-384-v1";
+    private const int EmbeddingStorageLength = 388;
+    private const string GenerationMetadataKey = "generation";
+    private const string IncarnationMetadataKey = "incarnation";
 
     private readonly string _databasePath;
+    private readonly string _indexLockPath;
     private readonly SemaphoreSlim _preparationGate = new(1, 1);
     private LocalEmbedder? _embedder;
     private IReadOnlyDictionary<long, HybridSearchBlock> _blocks =
         new Dictionary<long, HybridSearchBlock>();
-    private bool _isReady;
+    private long _loadedGeneration = -1;
+    private string? _loadedIncarnation;
+    private volatile bool _isReady;
     private bool _disposed;
 
     public PersistentHybridSearchIndex(string databasePath)
@@ -33,6 +39,7 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
         _databasePath = Path.GetFullPath(databasePath);
+        _indexLockPath = _databasePath + ".lock";
     }
 
     public bool IsReady => _isReady;
@@ -76,8 +83,11 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                 Directory.CreateDirectory(databaseDirectory);
             }
 
+            using FileStream indexLock = await Task.Run(
+                () => AcquireIndexLock(cancellationToken),
+                cancellationToken).ConfigureAwait(false);
             using SqliteConnection connection =
-                OpenValidatedDatabase();
+                OpenValidatedDatabase(cancellationToken);
             Dictionary<string, IndexedSession> indexedSessions =
                 LoadIndexedSessions(connection);
             Dictionary<string, SessionDescriptor> sessionsById =
@@ -115,7 +125,9 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             foreach (string sessionId in removedSessionIds)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                DeleteSession(connection, sessionId);
+                DeleteSessionAndAdvanceGeneration(
+                    connection,
+                    sessionId);
                 completedOperations++;
                 ReportProgress(
                     progress,
@@ -156,9 +168,15 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                     totalOperations);
             }
 
-            _blocks = await Task.Run(
+            IReadOnlyDictionary<long, HybridSearchBlock> blocks =
+                await Task.Run(
                 () => LoadBlocks(connection),
                 cancellationToken).ConfigureAwait(false);
+            IndexIdentity identity =
+                LoadIndexIdentity(connection);
+            _blocks = blocks;
+            _loadedGeneration = identity.Generation;
+            _loadedIncarnation = identity.Incarnation;
             _isReady = true;
             stopwatch.Stop();
             connection.Close();
@@ -191,6 +209,11 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                     $"Local AI index ready: {metrics.Blocks:N0} blocks."));
             return metrics;
         }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             _isReady = false;
@@ -204,7 +227,8 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
 
     public HybridQueryResult Search(
         string query,
-        int maximumResults = 30)
+        int maximumResults = 30,
+        CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -215,86 +239,145 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                 "The local AI search index is not ready.");
         }
 
-        IReadOnlyList<string> terms = HybridSearchQuery.ExtractTerms(query);
-        var stopwatch = Stopwatch.StartNew();
-        IReadOnlyList<ChannelHit> wordHits = SearchFts(
-            "blocks_word",
-            HybridSearchQuery.CreateMatchExpression(terms),
-            maximumResults: 150);
-        stopwatch.Stop();
-        TimeSpan wordTime = stopwatch.Elapsed;
+        try
+        {
+            using FileStream indexLock =
+                AcquireIndexLock(cancellationToken);
+            using SqliteConnection connection =
+                OpenReadOnlyDatabase();
+            IndexIdentity identity =
+                LoadIndexIdentity(connection);
+            if (_loadedGeneration != identity.Generation
+                || !string.Equals(
+                    _loadedIncarnation,
+                    identity.Incarnation,
+                    StringComparison.Ordinal))
+            {
+                _blocks = LoadBlocks(connection);
+                _loadedGeneration = identity.Generation;
+                _loadedIncarnation = identity.Incarnation;
+            }
 
-        stopwatch.Restart();
-        IReadOnlyList<string> trigramTerms = terms
-            .Where(term => term.Length >= 3)
-            .ToArray();
-        IReadOnlyList<ChannelHit> trigramHits = trigramTerms.Count == 0
-            ? []
-            : SearchFts(
-                "blocks_trigram",
-                HybridSearchQuery.CreateMatchExpression(trigramTerms),
-                maximumResults: 150);
-        stopwatch.Stop();
-        TimeSpan trigramTime = stopwatch.Elapsed;
+            IReadOnlyList<string> terms =
+                HybridSearchQuery.ExtractTerms(query);
+            var stopwatch = Stopwatch.StartNew();
+            IReadOnlyList<ChannelHit> wordHits = SearchFts(
+                connection,
+                "blocks_word",
+                HybridSearchQuery.CreateMatchExpression(terms),
+                maximumResults: 150,
+                cancellationToken);
+            stopwatch.Stop();
+            TimeSpan wordTime = stopwatch.Elapsed;
 
-        stopwatch.Restart();
-        EmbeddingI8[] queryEmbeddings = HybridSearchQuery
-            .CreateSemanticQueries(query)
-            .Select(
-                semanticQuery =>
-                    GetEmbedder().Embed<EmbeddingI8>(semanticQuery))
-            .ToArray();
-        IReadOnlyList<ChannelHit> embeddingHits = _blocks.Values
-            .Select(
-                block => new ChannelHit(
-                    block.Id,
-                    queryEmbeddings.Max(
-                        queryEmbedding =>
-                            new EmbeddingI8(block.Embedding)
-                                .Similarity(queryEmbedding))))
-            .OrderByDescending(hit => hit.Score)
-            .Take(150)
-            .ToArray();
-        stopwatch.Stop();
-        TimeSpan embeddingTime = stopwatch.Elapsed;
+            stopwatch.Restart();
+            IReadOnlyList<string> trigramTerms = terms
+                .Where(term => term.Length >= 3)
+                .ToArray();
+            IReadOnlyList<ChannelHit> trigramHits =
+                trigramTerms.Count == 0
+                    ? []
+                    : SearchFts(
+                        connection,
+                        "blocks_trigram",
+                        HybridSearchQuery.CreateMatchExpression(
+                            trigramTerms),
+                        maximumResults: 150,
+                        cancellationToken);
+            stopwatch.Stop();
+            TimeSpan trigramTime = stopwatch.Elapsed;
 
-        stopwatch.Restart();
-        IReadOnlyList<ChannelHit> exactHits = _blocks.Values
-            .Select(
-                block => new ChannelHit(
-                    block.Id,
-                    HybridSearchQuery.ScoreExact(
-                        query,
-                        terms,
-                        block)))
-            .Where(hit => hit.Score > 0)
-            .OrderByDescending(hit => hit.Score)
-            .Take(150)
-            .ToArray();
-        stopwatch.Stop();
-        TimeSpan exactTime = stopwatch.Elapsed;
+            stopwatch.Restart();
+            EmbeddingI8[] queryEmbeddings = HybridSearchQuery
+                .CreateSemanticQueries(query)
+                .Select(
+                    semanticQuery =>
+                        GetEmbedder().Embed<EmbeddingI8>(
+                            semanticQuery))
+                .ToArray();
+            IReadOnlyList<ChannelHit> embeddingHits = _blocks
+                .Values
+                .Select(
+                    block =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return new ChannelHit(
+                            block.Id,
+                            queryEmbeddings.Max(
+                                queryEmbedding =>
+                                    new EmbeddingI8(block.Embedding)
+                                        .Similarity(queryEmbedding)));
+                    })
+                .OrderByDescending(hit => hit.Score)
+                .Take(150)
+                .ToArray();
+            stopwatch.Stop();
+            TimeSpan embeddingTime = stopwatch.Elapsed;
 
-        stopwatch.Restart();
-        IReadOnlyList<HybridRankedBlock> hybrid = Fuse(
-            wordHits,
-            trigramHits,
-            embeddingHits,
-            exactHits,
-            maximumResults);
-        stopwatch.Stop();
+            stopwatch.Restart();
+            IReadOnlyList<ChannelHit> exactHits = _blocks
+                .Values
+                .Select(
+                    block =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return new ChannelHit(
+                            block.Id,
+                            HybridSearchQuery.ScoreExact(
+                                query,
+                                terms,
+                                block));
+                    })
+                .Where(hit => hit.Score > 0)
+                .OrderByDescending(hit => hit.Score)
+                .Take(150)
+                .ToArray();
+            stopwatch.Stop();
+            TimeSpan exactTime = stopwatch.Elapsed;
 
-        return new HybridQueryResult(
-            query,
-            wordTime,
-            trigramTime,
-            embeddingTime,
-            exactTime,
-            stopwatch.Elapsed,
-            CreateSingleChannelResults(wordHits, Channel.Word),
-            CreateSingleChannelResults(
+            stopwatch.Restart();
+            IReadOnlyList<HybridRankedBlock> hybrid = Fuse(
+                wordHits,
+                trigramHits,
                 embeddingHits,
-                Channel.Embedding),
-            hybrid);
+                exactHits,
+                maximumResults);
+            stopwatch.Stop();
+
+            return new HybridQueryResult(
+                query,
+                wordTime,
+                trigramTime,
+                embeddingTime,
+                exactTime,
+                stopwatch.Elapsed,
+                CreateSingleChannelResults(
+                    wordHits,
+                    Channel.Word),
+                CreateSingleChannelResults(
+                    embeddingHits,
+                    Channel.Embedding),
+                hybrid);
+        }
+        catch (SqliteException ex) when (
+            IsRecoverableDatabaseError(ex))
+        {
+            _isReady = false;
+            throw new InvalidOperationException(
+                "The local AI search index is corrupted and will be rebuilt.",
+                ex);
+        }
+        catch (Exception ex) when (
+            ex is FormatException
+            or InvalidCastException
+            or InvalidDataException
+            or OverflowException)
+        {
+            _isReady = false;
+            throw new InvalidOperationException(
+                "The local AI search index is corrupted and will be rebuilt.",
+                ex);
+        }
     }
 
     public void Dispose()
@@ -310,28 +393,76 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         _preparationGate.Dispose();
     }
 
-    private SqliteConnection OpenValidatedDatabase()
+    private SqliteConnection OpenValidatedDatabase(
+        CancellationToken cancellationToken)
     {
-        SqliteConnection connection = OpenWritableDatabase();
-        CreateSchema(connection);
-        Dictionary<string, string> metadata = LoadMetadata(connection);
-        if (metadata.Count == 0)
+        SqliteConnection? connection = null;
+        try
         {
-            WriteMetadata(connection);
-            return connection;
-        }
+            connection = OpenWritableDatabase();
+            if (!HasValidDatabaseIntegrity(connection))
+            {
+                return RebuildDatabaseAndRelease(
+                    ref connection,
+                    cancellationToken);
+            }
 
-        if (HasExpectedVersions(metadata))
+            if (!TableExists(connection, "metadata"))
+            {
+                if (HasUserTables(connection))
+                {
+                    return RebuildDatabaseAndRelease(
+                        ref connection,
+                        cancellationToken);
+                }
+
+                CreateSchema(connection);
+                WriteMetadata(connection);
+                return TakeConnection(ref connection);
+            }
+
+            Dictionary<string, string> metadata =
+                LoadMetadata(connection);
+            if (metadata.Count == 0)
+            {
+                return RebuildDatabaseAndRelease(
+                    ref connection,
+                    cancellationToken);
+            }
+
+            if (!HasExpectedVersions(metadata))
+            {
+                return RebuildDatabaseAndRelease(
+                    ref connection,
+                    cancellationToken);
+            }
+
+            CreateSchema(connection);
+            EnsureIncarnation(connection);
+            ValidateStoredData(connection);
+            return TakeConnection(ref connection);
+        }
+        catch (SqliteException ex) when (
+            IsRecoverableDatabaseError(ex))
         {
-            return connection;
+            return RebuildDatabaseAndRelease(
+                ref connection,
+                cancellationToken);
         }
-
-        connection.Dispose();
-        DeleteDatabaseFiles();
-        connection = OpenWritableDatabase();
-        CreateSchema(connection);
-        WriteMetadata(connection);
-        return connection;
+        catch (Exception ex) when (
+            ex is FormatException
+            or InvalidCastException
+            or InvalidDataException
+            or OverflowException)
+        {
+            return RebuildDatabaseAndRelease(
+                ref connection,
+                cancellationToken);
+        }
+        finally
+        {
+            connection?.Dispose();
+        }
     }
 
     private SqliteConnection OpenWritableDatabase()
@@ -341,31 +472,65 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             {
                 DataSource = _databasePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
+                Pooling = false,
             }.ToString());
-        connection.Open();
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText =
-            """
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
-            PRAGMA temp_store = MEMORY;
-            """;
-        command.ExecuteNonQuery();
-        return connection;
+        bool initialized = false;
+        try
+        {
+            connection.Open();
+            using SqliteCommand command =
+                connection.CreateCommand();
+            command.CommandText =
+                """
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA temp_store = MEMORY;
+                """;
+            command.ExecuteNonQuery();
+            initialized = true;
+            return connection;
+        }
+        finally
+        {
+            if (!initialized)
+            {
+                connection.Dispose();
+            }
+        }
     }
 
-    private IReadOnlyList<ChannelHit> SearchFts(
-        string tableName,
-        string matchExpression,
-        int maximumResults)
+    private SqliteConnection OpenReadOnlyDatabase()
     {
-        using var connection = new SqliteConnection(
+        var connection = new SqliteConnection(
             new SqliteConnectionStringBuilder
             {
                 DataSource = _databasePath,
                 Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false,
             }.ToString());
-        connection.Open();
+        bool opened = false;
+        try
+        {
+            connection.Open();
+            opened = true;
+            return connection;
+        }
+        finally
+        {
+            if (!opened)
+            {
+                connection.Dispose();
+            }
+        }
+    }
+
+    private IReadOnlyList<ChannelHit> SearchFts(
+        SqliteConnection connection,
+        string tableName,
+        string matchExpression,
+        int maximumResults,
+        CancellationToken cancellationToken)
+    {
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             $"SELECT rowid, bm25({tableName}, 0.5, 1.0) " +
@@ -379,6 +544,7 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         var hits = new List<ChannelHit>();
         while (reader.Read())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             hits.Add(
                 new ChannelHit(
                     reader.GetInt64(0),
@@ -407,7 +573,13 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             .Select(
                 pair =>
                 {
-                    HybridSearchBlock block = _blocks[pair.Key];
+                    if (!_blocks.TryGetValue(
+                        pair.Key,
+                        out HybridSearchBlock? block))
+                    {
+                        return null;
+                    }
+
                     MutableRank rank = pair.Value;
                     return new HybridRankedBlock(
                         block,
@@ -419,6 +591,7 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                         rank.EmbeddingSimilarity,
                         rank.ExactScore);
                 })
+            .OfType<HybridRankedBlock>()
             .OrderByDescending(result => result.HybridScore)
             .ThenByDescending(result => result.Block.ModifiedTime)
             .ToArray();
@@ -480,7 +653,13 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             .Select(
                 (hit, index) =>
                 {
-                    HybridSearchBlock block = _blocks[hit.BlockId];
+                    if (!_blocks.TryGetValue(
+                        hit.BlockId,
+                        out HybridSearchBlock? block))
+                    {
+                        return null;
+                    }
+
                     int rank = index + 1;
                     return new HybridRankedBlock(
                         block,
@@ -494,6 +673,7 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
                             : null,
                         channel == Channel.Exact ? hit.Score : 0);
                 })
+            .OfType<HybridRankedBlock>()
             .ToArray();
     }
 
@@ -560,6 +740,7 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             "$modified_time",
             document.Session.ModifiedTime.ToString("O"));
         upsert.ExecuteNonQuery();
+        AdvanceGeneration(connection, transaction);
         transaction.Commit();
     }
 
@@ -627,6 +808,20 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         command.ExecuteNonQuery();
     }
 
+    private static void DeleteSessionAndAdvanceGeneration(
+        SqliteConnection connection,
+        string sessionId)
+    {
+        using SqliteTransaction transaction =
+            connection.BeginTransaction();
+        DeleteSession(
+            connection,
+            sessionId,
+            transaction);
+        AdvanceGeneration(connection, transaction);
+        transaction.Commit();
+    }
+
     private static Dictionary<string, IndexedSession> LoadIndexedSessions(
         SqliteConnection connection)
     {
@@ -644,6 +839,14 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             StringComparer.Ordinal);
         while (reader.Read())
         {
+            if (reader.IsDBNull(0)
+                || reader.IsDBNull(1)
+                || reader.IsDBNull(2))
+            {
+                throw new InvalidDataException(
+                    "The local AI index contains an invalid indexed session.");
+            }
+
             string sessionId = reader.GetString(0);
             sessions.Add(
                 sessionId,
@@ -716,12 +919,106 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             StringComparer.Ordinal);
         while (reader.Read())
         {
+            if (reader.IsDBNull(0)
+                || reader.IsDBNull(1))
+            {
+                throw new InvalidDataException(
+                    "The local AI index contains invalid metadata.");
+            }
+
             metadata.Add(
                 reader.GetString(0),
                 reader.GetString(1));
         }
 
         return metadata;
+    }
+
+    private static IndexIdentity LoadIndexIdentity(
+        SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT key, value
+            FROM metadata
+            WHERE key IN ($incarnation_key, $generation_key);
+            """;
+        command.Parameters.AddWithValue(
+            "$incarnation_key",
+            IncarnationMetadataKey);
+        command.Parameters.AddWithValue(
+            "$generation_key",
+            GenerationMetadataKey);
+        using SqliteDataReader reader = command.ExecuteReader();
+        string incarnation = string.Empty;
+        long generation = 0;
+        while (reader.Read())
+        {
+            string key = reader.GetString(0);
+            string value = reader.GetString(1);
+            if (string.Equals(
+                key,
+                IncarnationMetadataKey,
+                StringComparison.Ordinal))
+            {
+                incarnation = value;
+            }
+            else
+            {
+                if (!long.TryParse(
+                    value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out generation))
+                {
+                    throw new InvalidDataException(
+                        "The local AI index generation is invalid.");
+                }
+            }
+        }
+
+        return new IndexIdentity(
+            incarnation,
+            generation);
+    }
+
+    private static void EnsureIncarnation(
+        SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO metadata (key, value)
+            VALUES ($key, $value)
+            ON CONFLICT(key) DO NOTHING;
+            """;
+        command.Parameters.AddWithValue(
+            "$key",
+            IncarnationMetadataKey);
+        command.Parameters.AddWithValue(
+            "$value",
+            Guid.NewGuid().ToString("N"));
+        command.ExecuteNonQuery();
+    }
+
+    private static void AdvanceGeneration(
+        SqliteConnection connection,
+        SqliteTransaction transaction)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO metadata (key, value)
+            VALUES ($key, '1')
+            ON CONFLICT(key) DO UPDATE SET
+                value = CAST(value AS INTEGER) + 1;
+            """;
+        command.Parameters.AddWithValue(
+            "$key",
+            GenerationMetadataKey);
+        command.ExecuteNonQuery();
     }
 
     private static bool HasExpectedVersions(
@@ -756,6 +1053,10 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             new("fts", FtsVersion),
             new("embedding_model", EmbeddingModelVersion),
             new("embedding_format", EmbeddingFormatVersion),
+            new(GenerationMetadataKey, "0"),
+            new(
+                IncarnationMetadataKey,
+                Guid.NewGuid().ToString("N")),
         ];
         using SqliteTransaction transaction = connection.BeginTransaction();
         using SqliteCommand command = connection.CreateCommand();
@@ -784,11 +1085,11 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         command.CommandText =
             """
             CREATE TABLE IF NOT EXISTS metadata (
-                key TEXT PRIMARY KEY,
+                key TEXT PRIMARY KEY NOT NULL,
                 value TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS indexed_sessions (
-                session_id TEXT PRIMARY KEY,
+                session_id TEXT PRIMARY KEY NOT NULL,
                 name TEXT NOT NULL,
                 modified_time TEXT NOT NULL
             );
@@ -891,7 +1192,240 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         return _embedder ??= new LocalEmbedder();
     }
 
-    private void DeleteDatabaseFiles()
+    private SqliteConnection RebuildDatabaseAndRelease(
+        ref SqliteConnection? connection,
+        CancellationToken cancellationToken)
+    {
+        connection?.Dispose();
+        connection = null;
+        _isReady = false;
+        _blocks = new Dictionary<long, HybridSearchBlock>();
+        _loadedGeneration = -1;
+        _loadedIncarnation = null;
+        DeleteDatabaseFiles(cancellationToken);
+        SqliteConnection? rebuilt = null;
+        try
+        {
+            rebuilt = OpenWritableDatabase();
+            CreateSchema(rebuilt);
+            WriteMetadata(rebuilt);
+            return TakeConnection(ref rebuilt);
+        }
+        finally
+        {
+            rebuilt?.Dispose();
+        }
+    }
+
+    private static SqliteConnection TakeConnection(
+        ref SqliteConnection? connection)
+    {
+        SqliteConnection result = connection
+            ?? throw new InvalidOperationException(
+                "The SQLite connection was unavailable.");
+        connection = null;
+        return result;
+    }
+
+    private static bool TableExists(
+        SqliteConnection connection,
+        string tableName)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name = $name);
+            """;
+        command.Parameters.AddWithValue("$name", tableName);
+        return Convert.ToInt32(
+            command.ExecuteScalar(),
+            CultureInfo.InvariantCulture) != 0;
+    }
+
+    private static bool HasUserTables(
+        SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name NOT LIKE 'sqlite_%');
+            """;
+        return Convert.ToInt32(
+            command.ExecuteScalar(),
+            CultureInfo.InvariantCulture) != 0;
+    }
+
+    private static bool HasValidDatabaseIntegrity(
+        SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "PRAGMA quick_check;";
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read()
+            && string.Equals(
+                reader.GetString(0),
+                "ok",
+                StringComparison.OrdinalIgnoreCase)
+            && !reader.Read();
+    }
+
+    private static void ValidateStoredData(
+        SqliteConnection connection)
+    {
+        IndexIdentity identity = LoadIndexIdentity(connection);
+        if (string.IsNullOrWhiteSpace(identity.Incarnation))
+        {
+            throw new InvalidDataException(
+                "The local AI index has no incarnation identifier.");
+        }
+
+        _ = LoadIndexedSessions(connection);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                modified_time,
+                message_number,
+                chunk_number,
+                typeof(session_id),
+                typeof(session_name),
+                typeof(modified_time),
+                typeof(message_number),
+                typeof(chunk_number),
+                typeof(speaker),
+                typeof(body),
+                typeof(retrieval_text),
+                typeof(embedding),
+                length(embedding)
+            FROM blocks
+            """;
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            _ = DateTimeOffset.Parse(
+                reader.GetString(0),
+                CultureInfo.InvariantCulture);
+            long messageNumber = reader.GetInt64(1);
+            long chunkNumber = reader.GetInt64(2);
+            if (messageNumber is < int.MinValue or > int.MaxValue
+                || chunkNumber is < int.MinValue or > int.MaxValue)
+            {
+                throw new InvalidDataException(
+                    "The local AI index contains an invalid message or chunk number.");
+            }
+
+            for (int column = 3; column <= 5; column++)
+            {
+                if (!string.Equals(
+                    reader.GetString(column),
+                    "text",
+                    StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "The local AI index contains an invalid text value.");
+                }
+            }
+
+            for (int column = 6; column <= 7; column++)
+            {
+                if (!string.Equals(
+                    reader.GetString(column),
+                    "integer",
+                    StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "The local AI index contains an invalid numeric value.");
+                }
+            }
+
+            for (int column = 8; column <= 10; column++)
+            {
+                if (!string.Equals(
+                    reader.GetString(column),
+                    "text",
+                    StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "The local AI index contains an invalid text value.");
+                }
+            }
+
+            if (!string.Equals(
+                reader.GetString(11),
+                "blob",
+                StringComparison.Ordinal)
+                || reader.GetInt64(12) != EmbeddingStorageLength)
+            {
+                throw new InvalidDataException(
+                    "The local AI index contains an invalid embedding vector.");
+            }
+        }
+    }
+
+    private static bool IsCorrupt(SqliteException exception)
+    {
+        const int SqliteCorrupt = 11;
+        const int SqliteNotADatabase = 26;
+        return exception.SqliteErrorCode is
+            SqliteCorrupt
+            or SqliteNotADatabase;
+    }
+
+    private static bool IsRecoverableDatabaseError(
+        SqliteException exception)
+    {
+        const int SqliteError = 1;
+        return IsCorrupt(exception)
+            || exception.SqliteErrorCode == SqliteError;
+    }
+
+    private FileStream AcquireIndexLock(
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(
+                    _indexLockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None);
+            }
+            catch (IOException ex) when (
+                IsSharingViolation(ex))
+            {
+                if (cancellationToken.WaitHandle.WaitOne(
+                    TimeSpan.FromMilliseconds(100)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+        }
+    }
+
+    private static bool IsSharingViolation(
+        IOException exception)
+    {
+        const int SharingViolation = 32;
+        const int LockViolation = 33;
+        int errorCode = exception.HResult & 0xFFFF;
+        return errorCode is
+            SharingViolation
+            or LockViolation;
+    }
+
+    private void DeleteDatabaseFiles(
+        CancellationToken cancellationToken)
     {
         foreach (string path in new[]
         {
@@ -900,9 +1434,23 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             _databasePath + "-wal",
         })
         {
-            if (File.Exists(path))
+            for (int attempt = 0;
+                File.Exists(path);
+                attempt++)
             {
-                File.Delete(path);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    File.Delete(path);
+                }
+                catch (IOException) when (attempt < 50)
+                {
+                    if (cancellationToken.WaitHandle.WaitOne(
+                        TimeSpan.FromMilliseconds(100)))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                }
             }
         }
     }
@@ -925,6 +1473,10 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
         string SessionId,
         string Name,
         DateTimeOffset ModifiedTime);
+
+    private sealed record IndexIdentity(
+        string Incarnation,
+        long Generation);
 
     private sealed class MutableRank
     {
