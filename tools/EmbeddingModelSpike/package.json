@@ -1,0 +1,13 @@
+{
+  "name": "copilot-session-search-embedding-model-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0",
+    "better-sqlite3": "11.10.0"
+  },
+  "overrides": {
+    "adm-zip": "0.6.1",
+    "sharp": "0.35.4"
+  }
+}
