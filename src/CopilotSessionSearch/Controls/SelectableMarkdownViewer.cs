@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using CopilotSessionSearch.Models;
 using CopilotSessionSearch.Services;
@@ -238,7 +239,20 @@ public sealed class SelectableMarkdownViewer : MarkdownScrollViewer
 
     private void RenderMarkdown()
     {
-        Markdown = MarkdownContentSanitizer.Sanitize(SourceMarkdown ?? string.Empty);
+        string sourceMarkdown = SourceMarkdown ?? string.Empty;
+        try
+        {
+            Markdown = MarkdownContentSanitizer.Sanitize(
+                sourceMarkdown);
+        }
+        catch (Exception ex) when (
+            ex is InvalidOperationException
+            or XamlParseException)
+        {
+            Document = new FlowDocument(
+                new Paragraph(
+                    new Run(sourceMarkdown)));
+        }
 
         FlowDocument? document = Document;
         if (document is null)
