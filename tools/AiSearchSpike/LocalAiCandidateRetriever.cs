@@ -4,10 +4,11 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CopilotSessionSearch.Models;
+using CopilotSessionSearch.Services;
 
-namespace CopilotSessionSearch.Services;
+namespace AiSearchSpike;
 
-public static class LocalAiCandidateRetriever
+internal static class LocalAiCandidateRetriever
 {
     private static readonly Regex QuantitativeSignalPattern = new(
         @"\b\d+(?:\.\d+)?\s*(?:%|x|ms|msec|s|sec|secs|second|seconds|mb|gb|kb|bytes?)\b",
