@@ -30,7 +30,7 @@ public sealed class AiSearchPlan
 
 public sealed class AiRankingResponse
 {
-    public List<AiRankingItem> Results { get; set; } = [];
+    public List<AiRankingItem>? Results { get; set; }
 }
 
 public sealed class AiRankingItem

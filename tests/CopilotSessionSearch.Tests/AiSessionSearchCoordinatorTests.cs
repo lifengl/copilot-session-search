@@ -229,6 +229,263 @@ public sealed class AiSessionSearchCoordinatorTests
         Assert.True(aiSession.WasDisposed);
     }
 
+    [Fact]
+    public async Task SearchFallsBackToLocalRankingWhenSessionCreationFails()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Measured comparison.")]);
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new ThrowingAiSearchSessionFactory(
+                new InvalidOperationException(
+                    "Copilot is unavailable.")));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find a comparison",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal("local", result.AiRelevance?.Confidence);
+        Assert.Contains(
+            updates,
+            update => update.WarningMessage?.Contains(
+                "Copilot is unavailable",
+                StringComparison.Ordinal) is true);
+    }
+
+    [Fact]
+    public async Task SearchTreatsEmptyRankingAsNoRelevantResults()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Related but irrelevant text.")]);
+        var aiSession = new FakeAiSearchSession
+        {
+            ReturnEmptyRanking = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find specific evidence",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        Assert.DoesNotContain(
+            updates,
+            update => update.Result is not null);
+        Assert.DoesNotContain(
+            updates,
+            update => update.WarningMessage is not null);
+        Assert.Contains(
+            updates,
+            update => update.StatusText?.Contains(
+                "no relevant sessions",
+                StringComparison.OrdinalIgnoreCase) is true);
+        Assert.True(aiSession.WasDisposed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SearchPreservesResultsWhenSessionCleanupFails(
+        bool rankingFails)
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Useful evidence.")]);
+        var aiSession = new FakeAiSearchSession
+        {
+            DisposalException = new IOException(
+                "Cleanup failed."),
+            FailWhileRanking = rankingFails,
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find useful evidence",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Single(
+            updates,
+            update => update.Result is not null);
+        Assert.Contains(
+            updates,
+            update => update.WarningMessage?.Contains(
+                "Cleanup failed",
+                StringComparison.Ordinal) is true);
+        Assert.True(aiSession.WasDisposed);
+    }
+
+    [Fact]
+    public async Task CancellationDuringCleanupDoesNotBecomeEmptySuccess()
+    {
+        SessionDescriptor descriptor = CreateDescriptor(
+            "session",
+            "Session",
+            day: 1);
+        var historySource = new FakeHistorySource(
+            [CreateDocument(descriptor, "Irrelevant text.")]);
+        using var cancellationSource =
+            new CancellationTokenSource();
+        var aiSession = new FakeAiSearchSession
+        {
+            DisposeAction = cancellationSource.Cancel,
+            ReturnEmptyRanking = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [CreateHybridResult(descriptor, messageNumber: 1, score: 0.8)]),
+            new FakeAiSearchSessionFactory(aiSession));
+
+        async Task EnumerateAsync()
+        {
+            await foreach (SessionSearchUpdate _ in coordinator.SearchAsync(
+                "Find specific evidence",
+                new SessionSearchOptions(
+                    MatchWholeWord: false,
+                    IsCaseSensitive: false,
+                    UseRegularExpression: false,
+                    UseAiSearch: true),
+                cancellationSource.Token))
+            {
+            }
+        }
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            EnumerateAsync);
+        Assert.True(aiSession.WasDisposed);
+    }
+
+    [Fact]
+    public async Task SearchSkipsUnreadableCandidateSession()
+    {
+        SessionDescriptor readable = CreateDescriptor(
+            "readable",
+            "Readable",
+            day: 1);
+        SessionDescriptor unreadable = CreateDescriptor(
+            "unreadable",
+            "Unreadable",
+            day: 2);
+        var historySource = new FakeHistorySource(
+            [
+                CreateDocument(readable, "Useful evidence."),
+                CreateDocument(unreadable, "Unavailable evidence."),
+            ],
+            unreadableSessionIds: [unreadable.SessionId]);
+        var aiSession = new FakeAiSearchSession
+        {
+            RankCandidatesInInputOrder = true,
+        };
+        var coordinator = new AiSessionSearchCoordinator(
+            historySource,
+            new SessionDocumentCache(),
+            new FakeHybridSearchIndex(
+                [
+                    CreateHybridResult(
+                        unreadable,
+                        messageNumber: 1,
+                        score: 0.9),
+                    CreateHybridResult(
+                        readable,
+                        messageNumber: 1,
+                        score: 0.8),
+                ],
+                failures:
+                [
+                    new SessionSearchFailure(
+                        unreadable,
+                        "Indexing failed."),
+                ]),
+            new FakeAiSearchSessionFactory(aiSession));
+        var updates = new List<SessionSearchUpdate>();
+
+        await foreach (SessionSearchUpdate update in coordinator.SearchAsync(
+            "Find useful evidence",
+            new SessionSearchOptions(
+                MatchWholeWord: false,
+                IsCaseSensitive: false,
+                UseRegularExpression: false,
+                UseAiSearch: true),
+            CancellationToken.None))
+        {
+            updates.Add(update);
+        }
+
+        SessionSearchResult result = Assert.Single(
+            updates
+                .Where(update => update.Result is not null)
+                .Select(update => update.Result!));
+        Assert.Equal(
+            readable.SessionId,
+            result.Session.SessionId);
+        Assert.Single(aiSession.ReceivedCandidates);
+        Assert.Contains(
+            updates,
+            update =>
+                update.Failure?.Session.SessionId
+                    == unreadable.SessionId);
+        Assert.Equal(
+            1,
+            updates.Max(update => update.Progress.FailedSessions));
+        Assert.True(aiSession.WasDisposed);
+    }
+
     private static SessionDescriptor CreateDescriptor(
         string id,
         string name,
@@ -291,10 +548,16 @@ public sealed class AiSessionSearchCoordinatorTests
     private sealed class FakeHistorySource : ISessionHistorySource
     {
         private readonly IReadOnlyList<SessionDocument> _documents;
+        private readonly HashSet<string> _unreadableSessionIds;
 
-        public FakeHistorySource(IReadOnlyList<SessionDocument> documents)
+        public FakeHistorySource(
+            IReadOnlyList<SessionDocument> documents,
+            IEnumerable<string>? unreadableSessionIds = null)
         {
             _documents = documents;
+            _unreadableSessionIds = new HashSet<string>(
+                unreadableSessionIds ?? [],
+                StringComparer.Ordinal);
         }
 
         public Task<IReadOnlyList<SessionDescriptor>> GetSessionsAsync(
@@ -310,6 +573,13 @@ public sealed class AiSessionSearchCoordinatorTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_unreadableSessionIds.Contains(
+                session.SessionId))
+            {
+                throw new InvalidDataException(
+                    "The persisted session could not be read.");
+            }
+
             return Task.FromResult(
                 _documents.Single(
                     document => document.Session.SessionId == session.SessionId));
@@ -318,6 +588,26 @@ public sealed class AiSessionSearchCoordinatorTests
         public ValueTask DisposeAsync()
         {
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingAiSearchSessionFactory :
+        IAiSearchSessionFactory
+    {
+        private readonly Exception _exception;
+
+        public ThrowingAiSearchSessionFactory(
+            Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public Task<IAiSearchSession> CreateAsync(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromException<IAiSearchSession>(
+                _exception);
         }
     }
 
@@ -348,6 +638,12 @@ public sealed class AiSessionSearchCoordinatorTests
         public bool FailWhileRanking { get; init; }
 
         public bool RankCandidatesInInputOrder { get; init; }
+
+        public bool ReturnEmptyRanking { get; init; }
+
+        public Exception? DisposalException { get; init; }
+
+        public Action? DisposeAction { get; init; }
 
         public bool WasDisposed { get; private set; }
 
@@ -412,6 +708,11 @@ public sealed class AiSessionSearchCoordinatorTests
                     "The reranker returned no valid candidate IDs.");
             }
 
+            if (ReturnEmptyRanking)
+            {
+                return [];
+            }
+
             if (RankCandidatesInInputOrder)
             {
                 return candidates
@@ -473,18 +774,25 @@ public sealed class AiSessionSearchCoordinatorTests
         public ValueTask DisposeAsync()
         {
             WasDisposed = true;
-            return ValueTask.CompletedTask;
+            DisposeAction?.Invoke();
+            return DisposalException is null
+                ? ValueTask.CompletedTask
+                : ValueTask.FromException(
+                    DisposalException);
         }
     }
 
     private sealed class FakeHybridSearchIndex : IHybridSearchIndex
     {
         private readonly IReadOnlyList<HybridRankedBlock> _results;
+        private readonly IReadOnlyList<SessionSearchFailure> _failures;
 
         public FakeHybridSearchIndex(
-            IReadOnlyList<HybridRankedBlock> results)
+            IReadOnlyList<HybridRankedBlock> results,
+            IReadOnlyList<SessionSearchFailure>? failures = null)
         {
             _results = results;
+            _failures = failures ?? [];
         }
 
         public bool IsReady => true;
@@ -508,7 +816,7 @@ public sealed class AiSessionSearchCoordinatorTests
                     DatabaseBytes: 0,
                     UpdatedSessions: 0,
                     RemovedSessions: 0,
-                    Failures: [],
+                    Failures: _failures,
                     UpdateTime: TimeSpan.Zero));
         }
 

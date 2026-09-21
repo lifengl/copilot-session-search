@@ -58,6 +58,17 @@ public static class AiSearchJson
                 "The reranker returned an empty response.");
         }
 
+        if (ranking.Results is null)
+        {
+            throw new InvalidDataException(
+                "The reranker response did not contain a results array.");
+        }
+
+        if (ranking.Results.Count == 0)
+        {
+            return [];
+        }
+
         Dictionary<string, AiSearchCandidate> candidatesById = candidates
             .ToDictionary(
                 candidate => candidate.CandidateId,

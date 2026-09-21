@@ -79,6 +79,9 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
             CompletedSessions = sessions.Count,
             FailedSessions = indexMetrics.Failures.Count,
         };
+        var failedSessionIds = indexMetrics.Failures
+            .Select(failure => failure.Session.SessionId)
+            .ToHashSet(StringComparer.Ordinal);
 
         foreach (SessionSearchFailure failure in indexMetrics.Failures)
         {
@@ -129,12 +132,42 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 continue;
             }
 
-            documentsBySessionId[sessionId] = await _documentCache
-                .GetOrLoadAsync(
+            SessionSearchFailure? readFailure = null;
+            try
+            {
+                documentsBySessionId[sessionId] =
+                    await _documentCache
+                        .GetOrLoadAsync(
+                            session,
+                            _historySource.GetSessionDocumentAsync,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (
+                ex is not OperationCanceledException)
+            {
+                readFailure = new SessionSearchFailure(
                     session,
-                    _historySource.GetSessionDocumentAsync,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    ex.Message);
+            }
+
+            if (readFailure is not null)
+            {
+                if (failedSessionIds.Add(
+                    readFailure.Session.SessionId))
+                {
+                    progress = progress with
+                    {
+                        FailedSessions =
+                            progress.FailedSessions + 1,
+                    };
+                    yield return new SessionSearchUpdate(
+                        null,
+                        readFailure,
+                        progress,
+                        $"Skipping unreadable AI candidate session {session.Name}.");
+                }
+            }
         }
 
         AiSearchCandidate[] candidates = localResult.HybridResults
@@ -147,6 +180,16 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                     documentsBySessionId[result.Block.SessionId],
                     index))
             .ToArray();
+        if (candidates.Length == 0)
+        {
+            yield return new SessionSearchUpdate(
+                null,
+                null,
+                progress,
+                "AI search complete. No readable local candidates were found.");
+            yield break;
+        }
+
         yield return new SessionSearchUpdate(
             null,
             null,
@@ -154,17 +197,24 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
             $"Asking Copilot to rank {candidates.Length:N0} hybrid message blocks...",
             IsProgressIndeterminate: true);
 
-        await using IAiSearchSession aiSession = await _aiSessionFactory
-            .CreateAsync(cancellationToken)
-            .ConfigureAwait(false);
         List<AiRankingItem> rankings;
         string? rerankingWarning = null;
+        var usage = new AiUsageSummary(
+            ApiCalls: 0,
+            InputTokens: 0,
+            OutputTokens: 0,
+            AiCredits: 0);
+        IAiSearchSession? aiSession = null;
         try
         {
+            aiSession = await _aiSessionFactory
+                .CreateAsync(cancellationToken)
+                .ConfigureAwait(false);
             rankings = await aiSession.RankAsync(
                 query,
                 candidates,
                 cancellationToken).ConfigureAwait(false);
+            usage = aiSession.GetUsage();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -173,6 +223,40 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 ex.Message;
             rankings = CreateLocalFallbackRankings(candidates);
         }
+        finally
+        {
+            if (aiSession is not null)
+            {
+                try
+                {
+                    await aiSession
+                        .DisposeAsync()
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    rerankingWarning = AppendWarning(
+                        rerankingWarning,
+                        "Copilot session cleanup failed: " +
+                        ex.Message);
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (rankings.Count == 0)
+        {
+            yield return new SessionSearchUpdate(
+                null,
+                null,
+                progress,
+                $"AI search complete. Copilot found no relevant sessions. " +
+                    $"{usage.ApiCalls:N0} model call(s), " +
+                    $"{usage.AiCredits:N2} AI credits.",
+                rerankingWarning);
+            yield break;
+        }
+
         Dictionary<string, AiSearchCandidate> candidatesById = candidates
             .ToDictionary(
                 candidate => candidate.CandidateId,
@@ -213,7 +297,6 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 IsProgressIndeterminate: true);
         }
 
-        AiUsageSummary usage = aiSession.GetUsage();
         yield return new SessionSearchUpdate(
             null,
             null,
@@ -371,6 +454,15 @@ public sealed class AiSessionSearchCoordinator : IAiSessionSearchCoordinator
                 })
             .Take(15)
             .ToList();
+    }
+
+    private static string AppendWarning(
+        string? existingWarning,
+        string additionalWarning)
+    {
+        return string.IsNullOrWhiteSpace(existingWarning)
+            ? additionalWarning
+            : existingWarning + " " + additionalWarning;
     }
 
     private sealed record RankedCandidate(
