@@ -16,8 +16,8 @@ public partial class MainWindow : Window
     private readonly MainWindowViewModel _viewModel;
     private readonly IConsoleLauncher _consoleLauncher;
     private readonly IClipboardService _clipboardService;
-    private readonly Dictionary<string, SessionDetailsWindow> _detailWindows =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<SessionSearchResult, SessionDetailsWindow>
+        _detailWindows = new(ReferenceEqualityComparer.Instance);
     private bool _allowClose;
     private bool _shutdownStarted;
 
@@ -187,15 +187,9 @@ public partial class MainWindow : Window
 
     private void ShowDetails(SessionSearchResult result)
     {
-        string windowKey = string.Join(
-            "\0",
-            result.Session.SessionId,
-            result.Query,
-            result.Options.MatchWholeWord,
-            result.Options.IsCaseSensitive,
-            result.Options.UseRegularExpression,
-            result.Options.UseAiSearch);
-        if (_detailWindows.TryGetValue(windowKey, out SessionDetailsWindow? existingWindow))
+        if (_detailWindows.TryGetValue(
+            result,
+            out SessionDetailsWindow? existingWindow))
         {
             existingWindow.Activate();
             return;
@@ -211,8 +205,9 @@ public partial class MainWindow : Window
             Owner = this,
         };
 
-        detailsWindow.Closed += (_, _) => _detailWindows.Remove(windowKey);
-        _detailWindows.Add(windowKey, detailsWindow);
+        detailsWindow.Closed += (_, _) =>
+            _detailWindows.Remove(result);
+        _detailWindows.Add(result, detailsWindow);
         detailsWindow.Show();
     }
 

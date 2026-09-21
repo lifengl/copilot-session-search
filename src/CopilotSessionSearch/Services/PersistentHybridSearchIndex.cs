@@ -261,12 +261,14 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             IReadOnlyList<string> terms =
                 HybridSearchQuery.ExtractTerms(query);
             var stopwatch = Stopwatch.StartNew();
-            IReadOnlyList<ChannelHit> wordHits = SearchFts(
-                connection,
-                "blocks_word",
-                HybridSearchQuery.CreateMatchExpression(terms),
-                maximumResults: 150,
-                cancellationToken);
+            IReadOnlyList<ChannelHit> wordHits = terms.Count == 0
+                ? []
+                : SearchFts(
+                    connection,
+                    "blocks_word",
+                    HybridSearchQuery.CreateMatchExpression(terms),
+                    maximumResults: 150,
+                    cancellationToken);
             stopwatch.Stop();
             TimeSpan wordTime = stopwatch.Elapsed;
 
@@ -315,23 +317,25 @@ public sealed class PersistentHybridSearchIndex : IHybridSearchIndex
             TimeSpan embeddingTime = stopwatch.Elapsed;
 
             stopwatch.Restart();
-            IReadOnlyList<ChannelHit> exactHits = _blocks
-                .Values
-                .Select(
-                    block =>
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return new ChannelHit(
-                            block.Id,
-                            HybridSearchQuery.ScoreExact(
-                                query,
-                                terms,
-                                block));
-                    })
-                .Where(hit => hit.Score > 0)
-                .OrderByDescending(hit => hit.Score)
-                .Take(150)
-                .ToArray();
+            IReadOnlyList<ChannelHit> exactHits =
+                terms.Count == 0
+                    ? []
+                    : _blocks.Values
+                        .Select(
+                            block =>
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                return new ChannelHit(
+                                    block.Id,
+                                    HybridSearchQuery.ScoreExact(
+                                        query,
+                                        terms,
+                                        block));
+                            })
+                        .Where(hit => hit.Score > 0)
+                        .OrderByDescending(hit => hit.Score)
+                        .Take(150)
+                        .ToArray();
             stopwatch.Stop();
             TimeSpan exactTime = stopwatch.Elapsed;
 

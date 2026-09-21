@@ -435,6 +435,40 @@ public sealed class PersistentHybridSearchIndexTests
                     StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("C#")]
+    [InlineData("C++")]
+    [InlineData("R")]
+    [InlineData("the session")]
+    [InlineData("我们之前讨论过的死锁问题")]
+    public async Task SearchSupportsSemanticOnlyQueries(
+        string query)
+    {
+        using var workspace = new TemporaryDirectory();
+        string databasePath = Path.Combine(
+            workspace.Path,
+            "index.sqlite");
+        SessionDescriptor descriptor = CreateDescriptor();
+        using var index =
+            new PersistentHybridSearchIndex(databasePath);
+        await index.PrepareAsync(
+            new SingleDocumentHistorySource(
+                CreateDocument(
+                    descriptor,
+                    "Technical software investigation evidence.")),
+            new SessionDocumentCache(),
+            progress: null,
+            CancellationToken.None);
+
+        HybridQueryResult result = index.Search(
+            query,
+            maximumResults: 10);
+
+        Assert.Empty(result.WordResults);
+        Assert.NotEmpty(result.EmbeddingResults);
+        Assert.NotEmpty(result.HybridResults);
+    }
+
     [Fact]
     public async Task SearchRefreshesBlocksAfterDatabaseRebuild()
     {
